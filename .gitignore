@@ -47,7 +47,7 @@ android/.gradle/
 ios/Pods/
 ios/.symlinks/
 
-# FVM
+# FVM Version Cache
 .fvm/
 
 # Local PDF server

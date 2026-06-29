@@ -232,107 +232,112 @@ class ContentPreviewCard extends HookConsumerWidget {
             ),
           ),
 
-          // ── 情報領域 ──────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // カテゴリーバッジ・保存済みアイコン・削除ボタン
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(content.category,
-                          style: const TextStyle(fontSize: 10)),
-                    ),
-                    if (downloaded) ...[
-                      const SizedBox(width: 4),
-                      // 保存済みアイコン
-                      Icon(Icons.check_circle,
-                          size: 14, color: Colors.green.shade600),
-                    ],
-                    const Spacer(),
-                    // 保存済みの場合のみ削除ボタンを表示
-                    if (downloaded)
-                      GestureDetector(
-                        onTap: deleteFile,
-                        child: Icon(Icons.delete_outline,
-                            size: 18,
-                            color: Theme.of(context).colorScheme.error),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                // タイトル（最大2行）
-                Text(
-                  content.title,
-                  style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.bold),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-                // アクションボタン / ダウンロード進捗
-                if (isDownloading.value)
-                  // ダウンロード中: プログレスバー + キャンセルボタン
+          // ── 情報領域（高さ固定でサムネイル高さを安定させる） ───────────────
+          SizedBox(
+            height: 114,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // カテゴリーバッジ・保存済みアイコン・削除ボタン
                   Row(
                     children: [
-                      Expanded(
-                        child: ClipRRect(
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color:
+                              Theme.of(context).colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: progress.value,
-                            minHeight: 6,
-                          ),
                         ),
+                        child: Text(content.category,
+                            style: const TextStyle(fontSize: 10)),
                       ),
-                      const SizedBox(width: 6),
-                      GestureDetector(
-                        onTap: () => cancelToken.value.cancel(),
-                        child: Icon(Icons.cancel,
-                            size: 20,
-                            color: Theme.of(context).colorScheme.error),
-                      ),
+                      if (downloaded) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.check_circle,
+                            size: 14, color: Colors.green.shade600),
+                      ],
+                      const Spacer(),
+                      if (downloaded)
+                        GestureDetector(
+                          onTap: deleteFile,
+                          child: Icon(Icons.delete_outline,
+                              size: 18,
+                              color: Theme.of(context).colorScheme.error),
+                        ),
                     ],
-                  )
-                else if (downloaded)
-                  // 保存済み: 開くボタン
+                  ),
+                  const SizedBox(height: 4),
+                  // タイトル（2行分の高さを固定してサムネイルがずれないようにする）
                   SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        minimumSize: const Size(0, 30),
-                        textStyle: const TextStyle(fontSize: 12),
-                      ),
-                      onPressed: path != null
-                          ? () => context.go('/viewer', extra: path)
-                          : null,
-                      child: Text(l10n.open),
-                    ),
-                  )
-                else
-                  // 未ダウンロード: ダウンロードボタン
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        minimumSize: const Size(0, 30),
-                        textStyle: const TextStyle(fontSize: 12),
-                      ),
-                      onPressed: dirSnapshot.hasData ? download : null,
-                      child: Text(l10n.downloadAndSave),
+                    height: 36,
+                    child: Text(
+                      content.title,
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-              ],
+                  // アクションボタン / ダウンロード進捗（残り高さを埋める）
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: isDownloading.value
+                            // ダウンロード中: プログレスバー + キャンセルボタン
+                            ? Row(
+                                children: [
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        value: progress.value,
+                                        minHeight: 6,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  GestureDetector(
+                                    onTap: () => cancelToken.value.cancel(),
+                                    child: Icon(Icons.cancel,
+                                        size: 20,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error),
+                                  ),
+                                ],
+                              )
+                            : ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 4),
+                                  minimumSize: const Size(0, 28),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  textStyle: const TextStyle(fontSize: 11),
+                                ),
+                                onPressed: downloaded
+                                    ? (path != null
+                                        ? () =>
+                                            context.go('/viewer', extra: path)
+                                        : null)
+                                    : (dirSnapshot.hasData ? download : null),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(downloaded
+                                      ? l10n.open
+                                      : l10n.downloadAndSave),
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

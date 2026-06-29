@@ -194,8 +194,8 @@ class ContentListPage extends HookConsumerWidget {
         useMemoized(() => _loadContents(locale.languageCode), [locale]);
     final snapshot = useFuture(contentsFuture);
 
-    // 表示モード（デフォルトはリスト表示）
-    final viewMode = useState(_ViewMode.list);
+    // 表示モード（デフォルトはグリッド表示）
+    final viewMode = useState(_ViewMode.preview);
 
     // テーマモードアイコン（現在のモードを反映）
     final themeIcon = switch (themeMode) {
@@ -249,15 +249,15 @@ class ContentListPage extends HookConsumerWidget {
                   child: Text(l10n.loadError('${snapshot.error}')),
                 ),
               _ => viewMode.value == _ViewMode.preview
-                  // プレビューモード: 2列グリッドでPDFサムネイルを表示
+                  // プレビューモード: 3列グリッドでPDFサムネイルを表示
                   ? GridView.builder(
                       padding: const EdgeInsets.all(8),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,    // 2列
+                        crossAxisCount: 3,    // 3列
                         crossAxisSpacing: 8,  // 列間の余白
                         mainAxisSpacing: 8,   // 行間の余白
-                        mainAxisExtent: 300,  // 各グリッドアイテムの高さ（固定）
+                        mainAxisExtent: 260,  // 各グリッドアイテムの高さ（固定）
                       ),
                       itemCount: snapshot.data!.length,
                       itemBuilder: (context, index) => ContentPreviewCard(

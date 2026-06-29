@@ -1,6 +1,13 @@
 {
   "ja": [
     {
+      "id": "0",
+      "title": "SKYWARD 2026年5月号",
+      "description": "メルボルンとっておきの場所とびっきりの一杯",
+      "category": "機内誌",
+      "url": "http://localhost:8765/SKYWARD 2026年5月号.pdf"
+    },
+    {
       "id": "1",
       "title": "DX入門ガイド",
       "description": "デジタルトランスフォーメーションの基礎から実践まで解説。目次・内部リンク付き（8ページ）。",
@@ -30,6 +37,13 @@
     }
   ],
   "en": [
+    {
+      "id": "0",
+      "title": "SKYWARD May 2026",
+      "description": "Melbourne's favorite spots and finest drinks",
+      "category": "In-flight Magazine",
+      "url": "http://localhost:8765/SKYWARD 2026年5月号.pdf"
+    },
     {
       "id": "1",
       "title": "DX Beginner's Guide",

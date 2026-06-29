@@ -175,68 +175,60 @@ class ContentListCard extends HookConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // タイトル行（常に全幅・左寄せ）
+            Text(
+              content.title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            // バッジ行: カテゴリー・保存済み + 削除ボタン
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // カテゴリーバッジ
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(content.category,
-                          style: const TextStyle(fontSize: 11)),
-                    ),
-                    // 保存済みバッジ（ダウンロード済みの場合のみ）
-                    if (downloaded) ...[
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.green.shade300),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.check_circle,
-                                size: 11, color: Colors.green.shade700),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${l10n.saved}${size != null ? '  ${formatFileSize(size)}' : ''}',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.green.shade700),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    content.title,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
+                // カテゴリーバッジ
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(4),
                   ),
+                  child: Text(content.category,
+                      style: const TextStyle(fontSize: 11)),
                 ),
+                // 保存済みバッジ（ダウンロード済みの場合のみ）
+                if (downloaded) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.green.shade300),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_circle,
+                            size: 11, color: Colors.green.shade700),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${l10n.saved}${size != null ? '  ${formatFileSize(size)}' : ''}',
+                          style: TextStyle(
+                              fontSize: 10, color: Colors.green.shade700),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                // 削除ボタン（ダウンロード済みの場合のみ）
                 if (downloaded)
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    tooltip: l10n.delete,
-                    onPressed: deleteFile,
-                    padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 36, minHeight: 36),
+                  GestureDetector(
+                    onTap: deleteFile,
+                    child: const Icon(Icons.delete_outline,
+                        color: Colors.red, size: 20),
                   ),
               ],
             ),

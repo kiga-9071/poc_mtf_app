@@ -67,7 +67,7 @@ class AppL10n {
   String get saved => _ja ? '保存済み' : 'Saved';
 
   /// ダウンロードボタンのラベル
-  String get downloadAndSave => _ja ? 'ダウンロードして保存' : 'Download & Save';
+  String get downloadAndSave => _ja ? 'ダウンロード' : 'Download';
 
   /// ファイル削除ダイアログのタイトル
   String get deleteFile => _ja ? 'ファイルを削除' : 'Delete File';
