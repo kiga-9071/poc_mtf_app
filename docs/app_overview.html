@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDFアプリ 仕様概要書</title>
+  <style>
+    :root {
+      --brand: #CC0000;
+      --brand-light: #fff0f0;
+      --bg: #f7f8fa;
+      --card: #ffffff;
+      --text: #1a1a2e;
+      --text-muted: #555e6e;
+      --border: #e2e6ed;
+      --fixed: #e8f0fe;
+      --fixed-border: #4a90e2;
+      --flex: #e8f8ee;
+      --flex-border: #2eaa5f;
+      --section-pad: 2.5rem 2rem;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    /* ── ヘッダー ─────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 60%, #CC0000 100%);
+      color: #fff;
+      padding: 3rem 2rem 2.5rem;
+      text-align: center;
+    }
+    header .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 0.5rem;
+    }
+    header p {
+      color: rgba(255,255,255,0.75);
+      font-size: 14px;
+    }
+
+    /* ── ナビ（目次） ─────────────────────────── */
+    nav {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 2rem;
+      display: flex;
+      gap: 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    nav a:hover { background: var(--bg); color: var(--brand); }
+
+    /* ── 共通レイアウト ──────────────────────── */
+    .container { max-width: 960px; margin: 0 auto; padding: 0 1.5rem; }
+    section { padding: var(--section-pad); }
+    section + section { border-top: 1px solid var(--border); }
+
+    h2 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    h2::after {
+      content: '';
+      flex: 1;
+      height: 2px;
+      background: var(--border);
+      margin-left: 0.75rem;
+    }
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 1.5rem 0 0.75rem;
+      color: var(--text);
+    }
+    p { color: var(--text-muted); margin-bottom: 0.75rem; }
+    ul, ol { padding-left: 1.4rem; color: var(--text-muted); }
+    li { margin-bottom: 0.3rem; }
+
+    /* ── カード ──────────────────────────────── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .card .icon { font-size: 1.8rem; margin-bottom: 0.5rem; display: block; }
+    .card h4 { font-size: 1rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .card p { font-size: 13px; margin: 0; }
+
+    /* ── フロー図 ────────────────────────────── */
+    .flow {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 1.5rem 0;
+    }
+    .flow-box {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      text-align: center;
+      min-width: 140px;
+    }
+    .flow-box .icon { font-size: 1.6rem; display: block; margin-bottom: 0.3rem; }
+    .flow-box strong { display: block; font-size: 14px; }
+    .flow-box span { font-size: 12px; color: var(--text-muted); }
+    .flow-arrow {
+      font-size: 1.5rem;
+      color: var(--brand);
+      padding: 0 0.5rem;
+      font-weight: 700;
+    }
+
+    /* ── UI 自由度テーブル ───────────────────── */
+    .freedom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    @media (max-width: 640px) { .freedom-grid { grid-template-columns: 1fr; } }
+
+    .freedom-card {
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+    }
+    .freedom-card.fixed {
+      background: var(--fixed);
+      border: 1.5px solid var(--fixed-border);
+    }
+    .freedom-card.flex {
+      background: var(--flex);
+      border: 1.5px solid var(--flex-border);
+    }
+    .freedom-card h4 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .freedom-card.fixed h4 { color: #2c5cc5; }
+    .freedom-card.flex h4 { color: #1e7a45; }
+    .freedom-card ul { list-style: none; padding: 0; }
+    .freedom-card li {
+      font-size: 13px;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      display: flex;
+      gap: 0.5rem;
+    }
+    .freedom-card li:last-child { border-bottom: none; }
+    .freedom-card li::before { flex-shrink: 0; }
+    .freedom-card.fixed li::before { content: '🔒'; }
+    .freedom-card.flex li::before { content: '✏️'; }
+
+    /* ── 機能テーブル ────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 14px;
+      background: var(--card);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    thead tr { background: #2d2d4e; color: #fff; }
+    thead th { padding: 11px 14px; text-align: left; font-weight: 600; font-size: 13px; }
+    tbody tr:nth-child(even) { background: var(--bg); }
+    tbody td { padding: 10px 14px; color: var(--text-muted); vertical-align: top; }
+    tbody td:first-child { color: var(--text); font-weight: 600; white-space: nowrap; }
+
+    /* ── インタラクション画面別リスト ─────────── */
+    .screen-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    .screen-header {
+      background: #2d2d4e;
+      color: #fff;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .screen-body { padding: 1rem 1.25rem; }
+    .interaction-item {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border);
+      align-items: flex-start;
+    }
+    .interaction-item:last-child { border-bottom: none; }
+    .interaction-gesture {
+      background: var(--brand-light);
+      color: var(--brand);
+      border: 1px solid #f5c6c6;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .interaction-desc { font-size: 13px; color: var(--text-muted); }
+
+    /* ── PDF機能詳細 ─────────────────────────── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.875rem;
+      margin-top: 1rem;
+    }
+    .feature-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--brand);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+    }
+    .feature-item h5 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .feature-item p { font-size: 12px; margin: 0; }
+
+    /* ── バッジ ──────────────────────────────── */
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      margin-right: 4px;
+    }
+    .tag-user { background: #e3f2fd; color: #1565c0; }
+    .tag-dev  { background: #fce4ec; color: #b71c1c; }
+    .tag-auto { background: #e8f5e9; color: #1b5e20; }
+
+    /* ── 補足・注意 ─────────────────────────── */
+    .notice {
+      background: #fff8e1;
+      border: 1px solid #ffe082;
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      font-size: 13px;
+      color: #5d4037;
+      margin-top: 1rem;
+    }
+    .notice strong { color: #e65100; }
+
+    /* ── フッター ────────────────────────────── */
+    footer {
+      background: #1a1a2e;
+      color: rgba(255,255,255,0.55);
+      text-align: center;
+      padding: 2rem 1rem;
+      font-size: 13px;
+    }
+    footer a { color: #aac4ff; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    footer .footer-link {
+      display: inline-block;
+      margin-top: 1rem;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      color: #fff;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    footer .footer-link:hover { background: rgba(255,255,255,0.2); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<!-- ── ヘッダー ────────────────────────────────────────────────────── -->
+<header>
+  <div class="badge">仕様概要書 — 非エンジニア向け</div>
+  <h1>📄 PDFアプリ 仕様概要書</h1>
+  <p>更新日: 2026-06-23 &nbsp;|&nbsp; 対象OS: Android</p>
+</header>
+
+<!-- ── 目次ナビ ──────────────────────────────────────────────────────── -->
+<nav>
+  <a href="#overview">🏠 アプリ概要</a>
+  <a href="#freedom">🎨 UIの自由度</a>
+  <a href="#interaction">👆 操作・インタラクション</a>
+  <a href="#pdf-features">📖 PDFビューア機能</a>
+  <a href="#supplement">🔧 補足</a>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     1. アプリ概要
+════════════════════════════════════════════════════════════════════ -->
+<section id="overview">
+  <div class="container">
+    <h2>🏠 アプリ概要</h2>
+    <p>このアプリは、<strong>サーバー上のPDFをダウンロードして端末内で読む</strong>ことに特化したAndroid向けPDFリーダーです。コンテンツ（資料の種類・タイトル・URLなど）はアプリ内のJSONファイルで一元管理されており、配布する資料を入れ替えたり追加したりすることができます。</p>
+
+    <h3>画面の構成（全3画面）</h3>
+    <div class="flow">
+      <div class="flow-box">
+        <span class="icon">📋</span>
+        <strong>コンテンツ一覧</strong>
+        <span>資料の一覧・ダウンロード</span>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">
+        <span class="icon">📖</span>
+        <strong>PDFビューア</strong>
+        <span>PDF閲覧・検索・メモ</span>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">
+        <span class="icon">🌐</span>
+        <strong>WebView</strong>
+        <span>PDF内リンクをアプリ内表示</span>
+      </div>
+    </div>
+    <p style="text-align:center; font-size:13px;">※ 画面の遷移方向は上記の一方向のみ。WebViewからはPDFビューアに戻ります。</p>
+
+    <h3>基本スペック</h3>
+    <div class="card-grid">
+      <div class="card">
+        <span class="icon">📱</span>
+        <h4>対応OS</h4>
+        <p>Android のみ（iOS版は未対応）</p>
+      </div>
+      <div class="card">
+        <span class="icon">🌐</span>
+        <h4>通信要件</h4>
+        <p>初回ダウンロード時のみネット接続が必要。ダウンロード済みPDFはオフラインで閲覧可能</p>
+      </div>
+      <div class="card">
+        <span class="icon">💾</span>
+        <h4>ストレージ</h4>
+        <p>ダウンロードしたPDFは端末の内部ストレージ（Documentsフォルダ）に保存</p>
+      </div>
+      <div class="card">
+        <span class="icon">📦</span>
+        <h4>コンテンツ管理</h4>
+        <p>資料の一覧情報はアプリ内JSONファイルで管理。追加・差し替えはファイルを編集するだけ</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     2. UIの自由度
+════════════════════════════════════════════════════════════════════ -->
+<section id="freedom">
+  <div class="container">
+    <h2>🎨 UIの自由度</h2>
+    <p>アプリのUIには「変更できない固定部分」と「ユーザーや開発者が変えられる部分」があります。以下の表で整理しています。</p>
+
+    <div class="freedom-grid">
+      <div class="freedom-card fixed">
+        <h4>🔒 固定されている部分</h4>
+        <ul>
+          <li>各画面のレイアウト構造（配置・余白）</li>
+          <li>画面の遷移フロー（一覧→ビューア→WebView）</li>
+          <li>操作方法（スワイプ / ピンチ / タップ）</li>
+          <li>アイコンの種類・配置場所</li>
+          <li>テキストのフォントサイズ（基本値）</li>
+          <li>PDFの保存先フォルダ</li>
+          <li>ファイル名の命名形式</li>
+          <li>3画面の構成そのもの</li>
+        </ul>
+      </div>
+      <div class="freedom-card flex">
+        <h4>✏️ 変更できる部分</h4>
+        <ul>
+          <li>
+            <div>
+              <span class="tag tag-user">ユーザー操作</span><br>
+              テーマ（ライト / ダーク / システム連動）
+            </div>
+          </li>
+          <li>
+            <div>
+              <span class="tag tag-user">ユーザー操作</span><br>
+              表示言語（日本語 / 英語）
+            </div>
+          </li>
+          <li>
+            <div>
+              <span class="tag tag-user">ユーザー操作</span><br>
+              一覧の表示形式（リスト / グリッド）
+            </div>
+          </li>
+          <li>
+            <div>
+              <span class="tag tag-dev">開発作業</span><br>
+              ブランドカラー（ボタン・進捗バーの色）
+            </div>
+          </li>
+          <li>
+            <div>
+              <span class="tag tag-dev">開発作業</span><br>
+              配布するコンテンツ（資料の追加・差し替え）
+            </div>
+          </li>
+          <li>
+            <div>
+              <span class="tag tag-dev">開発作業</span><br>
+              対応言語の追加
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:1rem; font-size:13px; color: var(--text-muted);">
+      <span class="tag tag-user">ユーザー操作</span> アプリの設定画面（AppBar上のボタン）から変更可能 &nbsp;
+      <span class="tag tag-dev">開発作業</span> エンジニアによるコード・ファイル変更が必要
+    </div>
+
+    <h3>テーマ別の色の変化</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>UI要素</th>
+          <th>☀️ ライトモード</th>
+          <th>🌙 ダークモード</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>ヘッダーバー（AppBar）背景</td>
+          <td>白（#FFFFFF）</td>
+          <td>濃いグレー（#1E1E1E）</td>
+        </tr>
+        <tr>
+          <td>ヘッダーバー 文字・アイコン</td>
+          <td>黒（#000000）</td>
+          <td>白（#FFFFFF）</td>
+        </tr>
+        <tr>
+          <td>サイドメニュー ヘッダー背景</td>
+          <td>白（#FFFFFF）</td>
+          <td>濃いグレー（#1E1E1E）</td>
+        </tr>
+        <tr>
+          <td>PDFページ表示</td>
+          <td>通常表示</td>
+          <td>白黒反転表示（目に優しい）</td>
+        </tr>
+        <tr>
+          <td>ボタン・進捗バー（ブランドカラー）</td>
+          <td colspan="2" style="text-align:center;">赤（#CC0000）で統一</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     3. 操作・インタラクション
+════════════════════════════════════════════════════════════════════ -->
+<section id="interaction">
+  <div class="container">
+    <h2>👆 ユーザーが使える操作・インタラクション</h2>
+    <p>各画面でユーザーが行える操作・体験の一覧です。</p>
+
+    <!-- コンテンツ一覧 -->
+    <div class="screen-section">
+      <div class="screen-header">📋 コンテンツ一覧画面</div>
+      <div class="screen-body">
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ</span>
+          <span class="interaction-desc">「ダウンロード」ボタンをタップするとPDFのダウンロードが始まり、進捗バーでリアルタイムに状況が分かる</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ</span>
+          <span class="interaction-desc">ダウンロード済みの資料は「開く」ボタンをタップしてPDFビューアで閲覧</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ</span>
+          <span class="interaction-desc">ダウンロード中に「キャンセル」をタップすると中断できる（途中ファイルは破棄）</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ</span>
+          <span class="interaction-desc">ダウンロード済み資料の削除ボタン（🗑）をタップ → 確認ダイアログが表示され、OKで端末から削除</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ</span>
+          <span class="interaction-desc">AppBar右上の表示切替ボタンで「リスト表示」と「グリッド（サムネイル）表示」を切り替え</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ</span>
+          <span class="interaction-desc">AppBar右上の☀️/🌙ボタンでテーマ（ライト・ダーク・システム連動）を選択</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ</span>
+          <span class="interaction-desc">AppBar右上の🌐ボタンで表示言語（日本語・英語）を切り替え。次回起動時も維持される</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PDFビューア -->
+    <div class="screen-section">
+      <div class="screen-header">📖 PDFビューア画面</div>
+      <div class="screen-body">
+        <div class="interaction-item">
+          <span class="interaction-gesture">スワイプ（横）</span>
+          <span class="interaction-desc">ページを左右にスワイプして前後のページに移動</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">ピンチ</span>
+          <span class="interaction-desc">2本指のピンチ操作でページを最大5倍まで拡大縮小。拡大中はスワイプが無効になり誤操作を防止</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ（中央）</span>
+          <span class="interaction-desc">画面中央をタップするとヘッダーバーとサムネイルストリップの表示/非表示を切り替え。全画面でPDFに集中できる</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ（サムネイル）</span>
+          <span class="interaction-desc">画面下部のページサムネイル一覧をタップすると、そのページに即ジャンプ</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ</span>
+          <span class="interaction-desc">ブックマークボタン（🔖）をタップして現在ページにブックマークを設定/解除。端末を再起動しても保持される</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ</span>
+          <span class="interaction-desc">左上のメニューボタン（☰）でサイドドロワーを開く。目次・ブックマーク・キーワード検索の3タブを切り替えて使える</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ（リンク）</span>
+          <span class="interaction-desc">PDF内のURLリンクをタップするとアプリ内ブラウザ（WebView）で開く</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ（目次）</span>
+          <span class="interaction-desc">PDF内のページリンク（目次など）をタップすると該当ページにジャンプ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- WebView -->
+    <div class="screen-section">
+      <div class="screen-header">🌐 WebView画面（アプリ内ブラウザ）</div>
+      <div class="screen-body">
+        <div class="interaction-item">
+          <span class="interaction-gesture">自動遷移</span>
+          <span class="interaction-desc">PDFのURLリンクをタップすると自動でこの画面が開く。ユーザーが能動的に開くことはできない</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">タップ</span>
+          <span class="interaction-desc">ヘッダーバーの戻るボタンでPDFビューアに戻る</span>
+        </div>
+        <div class="interaction-item">
+          <span class="interaction-gesture">表示</span>
+          <span class="interaction-desc">ページ読み込み中はヘッダーバー下部に進捗バーが表示され、完了すると消える</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     4. PDFビューア 機能詳細
+════════════════════════════════════════════════════════════════════ -->
+<section id="pdf-features">
+  <div class="container">
+    <h2>📖 PDFビューア 機能詳細</h2>
+    <p>このアプリが提供するPDF閲覧機能の一覧です。</p>
+
+    <div class="feature-grid">
+      <div class="feature-item">
+        <h5>📄 ページ送り</h5>
+        <p>横スワイプで前後ページに移動。アニメーション付きでスムーズに切り替わる。</p>
+      </div>
+      <div class="feature-item">
+        <h5>🔍 ピンチズーム</h5>
+        <p>最大5倍まで拡大可能。拡大中はスワイプによる誤ページ切替を自動で防止。</p>
+      </div>
+      <div class="feature-item">
+        <h5>🔖 ブックマーク</h5>
+        <p>ページ単位でブックマーク。複数ページ同時保存可能。アプリを閉じても保持される。</p>
+      </div>
+      <div class="feature-item">
+        <h5>🔎 キーワード検索</h5>
+        <p>PDF全ページを横断してキーワード検索。ヒット箇所をハイライト表示し、前後ボタンで順番に確認できる。</p>
+      </div>
+      <div class="feature-item">
+        <h5>📑 目次ナビゲーション</h5>
+        <p>PDFに目次（アウトライン）が含まれる場合、サイドメニューの目次タブから各章に直接ジャンプ可能。</p>
+      </div>
+      <div class="feature-item">
+        <h5>🖼️ ページサムネイル</h5>
+        <p>画面下部に全ページのサムネイルを表示。タップで即ジャンプ、現在位置も自動スクロールで追従。</p>
+      </div>
+      <div class="feature-item">
+        <h5>🌙 ダークモード対応</h5>
+        <p>ダークモード時はPDFページの白黒を反転表示。暗所での目への負担を軽減。</p>
+      </div>
+      <div class="feature-item">
+        <h5>🔗 リンク対応</h5>
+        <p>PDF内のURLリンクはタップでアプリ内ブラウザが開く。ページリンクは該当ページへジャンプ。</p>
+      </div>
+      <div class="feature-item">
+        <h5>👁️ UI非表示モード</h5>
+        <p>画面タップでヘッダー・サムネイルを隠し、PDFだけを全面表示して集中して読める。</p>
+      </div>
+    </div>
+
+    <h3>サイドドロワーの3タブ構成</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>タブ</th>
+          <th>できること</th>
+          <th>条件</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>📑 目次</td>
+          <td>PDFのアウトライン（章・節の一覧）をタップしてページジャンプ</td>
+          <td>PDFに目次データが含まれる場合のみ表示</td>
+        </tr>
+        <tr>
+          <td>🔖 ブックマーク</td>
+          <td>保存済みのブックマークページ一覧から選択してジャンプ。個別削除も可能</td>
+          <td>ブックマーク登録済みのページがある場合</td>
+        </tr>
+        <tr>
+          <td>🔎 検索</td>
+          <td>キーワード入力 → PDF全体を検索 → ヒット一覧から該当ページへジャンプ、ハイライト表示</td>
+          <td>常に利用可能</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     5. 補足
+════════════════════════════════════════════════════════════════════ -->
+<section id="supplement">
+  <div class="container">
+    <h2>🔧 補足</h2>
+
+    <h3>テーマ・言語の切り替えについて</h3>
+    <p>テーマ（ライト/ダーク/システム連動）と表示言語（日本語/英語）はアプリ内で自由に変更でき、設定は次回起動後も引き継がれます。</p>
+    <table>
+      <thead>
+        <tr><th>設定項目</th><th>選択肢</th><th>変更場所</th><th>保持期間</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>テーマ</td>
+          <td>ライト / ダーク / システム連動</td>
+          <td>コンテンツ一覧 AppBar 右上ボタン</td>
+          <td>アプリを閉じても維持</td>
+        </tr>
+        <tr>
+          <td>表示言語</td>
+          <td>日本語 / 英語</td>
+          <td>コンテンツ一覧 AppBar 右上ボタン</td>
+          <td>アプリを閉じても維持</td>
+        </tr>
+        <tr>
+          <td>一覧表示形式</td>
+          <td>リスト / グリッド</td>
+          <td>コンテンツ一覧 AppBar 右上ボタン</td>
+          <td>アプリを閉じると初期値（リスト）に戻る</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>テスト用機能</h3>
+    <div class="notice">
+      <strong>⚠️ テスト・開発専用機能：</strong>コンテンツ一覧画面の最下部に「ストレージを初期化（テスト用）」ボタンがあります。これはダウンロード済みのPDFファイルやブックマークなど、アプリが保存したすべてのデータを削除するボタンです。確認ダイアログが表示されてからデータを削除します。<br><br>
+      このボタンは動作確認・テスト目的のもので、一般ユーザー向けには不要です。本番リリース前に削除することを推奨します。
+    </div>
+
+    <h3>コンテンツ（資料）の差し替え方法</h3>
+    <p>配布する資料の追加・差し替えは、アプリ内の <code>assets/contents.json</code> ファイルを編集するだけで対応できます。エンジニアによる作業が必要ですが、アプリ全体を作り直す必要はありません。</p>
+    <table>
+      <thead>
+        <tr><th>変更内容</th><th>必要な作業</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>資料のタイトル・説明文を変更する</td>
+          <td>JSONファイルを編集してアプリをリリース</td>
+        </tr>
+        <tr>
+          <td>資料を追加・削除する</td>
+          <td>JSONファイルにエントリを追加/削除してリリース</td>
+        </tr>
+        <tr>
+          <td>PDFファイル本体を更新する</td>
+          <td>サーバー上のPDFファイルを差し替える（アプリ修正不要）</td>
+        </tr>
+        <tr>
+          <td>ブランドカラーを変えたい</td>
+          <td>コードのカラー定義（#CC0000）を変更してリリース</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── フッター ──────────────────────────────────────────────────────── -->
+<footer>
+  <p>PDFアプリ 仕様概要書 &nbsp;|&nbsp; 更新日: 2026-06-23</p>
+  <p style="margin-top:0.5rem;">このドキュメントはシステム概要を非エンジニア向けに記述したものです。</p>
+  <a href="screen_definition.html" class="footer-link">
+    📐 エンジニア向け詳細仕様書はこちら（screen_definition.html）
+  </a>
+</footer>
+
+</body>
+</html>

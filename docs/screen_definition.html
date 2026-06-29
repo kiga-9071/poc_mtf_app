@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF アプリ 画面定義書</title>
+  <style>
+    :root {
+      --red:    #CC0000;
+      --red-dk: #8B0000;
+      --blue:   #1565C0;
+      --bg:     #f8f9fa;
+      --card:   #ffffff;
+      --border: #dee2e6;
+      --text:   #212529;
+      --muted:  #6c757d;
+      --head-h: 48px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Hiragino Sans", "Meiryo", sans-serif; font-size: 14px; color: var(--text); background: var(--bg); line-height: 1.6; }
+
+    /* ─── レイアウト ─────────────────────────────── */
+    .page-wrap { max-width: 1200px; margin: 0 auto; padding: 32px 24px 80px; }
+
+    /* ─── ヘッダー ──────────────────────────────── */
+    .doc-header { background: var(--red); color: #fff; padding: 32px 40px; margin-bottom: 40px; border-radius: 8px; }
+    .doc-header h1 { font-size: 26px; font-weight: 700; }
+    .doc-header p  { margin-top: 6px; opacity: .85; font-size: 13px; }
+    .meta-table { margin-top: 16px; border-collapse: collapse; }
+    .meta-table td { padding: 3px 12px 3px 0; font-size: 13px; opacity: .9; }
+    .meta-table td:first-child { opacity: .7; min-width: 80px; }
+
+    /* ─── 目次 ──────────────────────────────────── */
+    .toc { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 24px 28px; margin-bottom: 40px; }
+    .toc h2 { font-size: 16px; color: var(--red); margin-bottom: 12px; }
+    .toc ol { padding-left: 20px; }
+    .toc li { padding: 3px 0; }
+    .toc a  { color: var(--blue); text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    .toc ol ol { margin-top: 4px; }
+
+    /* ─── セクション ────────────────────────────── */
+    .section { margin-bottom: 48px; }
+    .section-title {
+      font-size: 20px; font-weight: 700; color: var(--red);
+      border-left: 5px solid var(--red); padding-left: 14px;
+      margin-bottom: 20px; padding-top: 4px; padding-bottom: 4px;
+    }
+    .sub-title {
+      font-size: 16px; font-weight: 600; color: #333;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 6px; margin: 28px 0 14px;
+    }
+    .sub2-title { font-size: 14px; font-weight: 600; color: #444; margin: 20px 0 8px; }
+
+    /* ─── カード ────────────────────────────────── */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin-bottom: 16px; }
+
+    /* ─── テーブル ──────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+    th { background: #f1f3f5; color: #495057; font-weight: 600; padding: 9px 12px; text-align: left; border: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+    tr:nth-child(even) td { background: #fafafa; }
+
+    /* ─── バッジ ────────────────────────────────── */
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-red    { background: #ffeaea; color: var(--red); border: 1px solid #ffcccc; }
+    .badge-blue   { background: #e8f0fe; color: var(--blue); border: 1px solid #b8d0fd; }
+    .badge-green  { background: #e6f9f0; color: #1a7c45; border: 1px solid #a8e6c7; }
+    .badge-gray   { background: #f1f3f5; color: #495057; border: 1px solid #ced4da; }
+    .badge-orange { background: #fff3e0; color: #bf6000; border: 1px solid #ffcc80; }
+
+    /* ─── 画面モックアップ ──────────────────────── */
+    .mockup-wrap { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 8px; }
+    .mockup {
+      border: 2px solid #aaa; border-radius: 16px; overflow: hidden;
+      width: 240px; font-size: 11px; flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    }
+    .mockup-label { text-align: center; font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .m-status { background: #222; color: #fff; height: 22px; display: flex; align-items: center; padding: 0 10px; font-size: 10px; justify-content: space-between; }
+    .m-appbar { height: 48px; display: flex; align-items: center; padding: 0 8px; gap: 4px; font-size: 12px; font-weight: 600; }
+    .m-appbar.white { background: #fff; color: #000; border-bottom: 1px solid #e0e0e0; }
+    .m-appbar.red   { background: var(--red); color: #fff; }
+    .m-appbar.dark  { background: #1E1E1E; color: #fff; }
+    .m-appbar .spacer { flex: 1; }
+    .m-appbar .icon-btn { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .m-body { background: #f5f5f5; min-height: 200px; padding: 8px; }
+    .m-body.dark { background: #121212; }
+    .m-body.black { background: #000; }
+    .m-card { background: #fff; border-radius: 6px; padding: 8px; margin-bottom: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .m-card.dark { background: #2c2c2c; color: #e0e0e0; }
+    .m-badge { display: inline-block; background: #ffeaea; color: var(--red); padding: 1px 5px; border-radius: 3px; font-size: 9px; margin-bottom: 3px; }
+    .m-badge.green { background: #e6f9f0; color: #1a7c45; border: 1px solid #a8e6c7; }
+    .m-title { font-weight: 700; font-size: 11px; margin-bottom: 2px; }
+    .m-desc  { font-size: 9px; color: #666; margin-bottom: 5px; }
+    .m-btn   { background: var(--red); color: #fff; border-radius: 4px; padding: 4px 0; text-align: center; font-size: 10px; }
+    .m-btn.outline { background: transparent; color: var(--red); border: 1px solid var(--red); }
+    .m-thumb-row { display: flex; gap: 4px; background: #444; padding: 4px 6px; }
+    .m-thumb { width: 36px; height: 50px; background: #fff; border-radius: 2px; position: relative; border: 1px solid #888; }
+    .m-thumb.active { border: 2px solid var(--red); }
+    .m-thumb-num { font-size: 8px; text-align: center; color: #ccc; background: rgba(0,0,0,.5); position: absolute; bottom: 0; width: 100%; }
+    .m-pdf-page { background: #fff; border-radius: 2px; margin: 4px; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+    .m-pdf-page.dark { background: #000; }
+    .m-topbar  { height: 44px; display: flex; align-items: center; padding: 0 4px; gap: 2px; font-size: 11px; font-weight: 600; }
+    .m-topbar.white { background: rgba(255,255,255,.97); color: #000; }
+    .m-topbar.dark  { background: rgba(30,30,30,.97); color: #fff; }
+    .m-topbar .spacer { flex: 1; text-align: center; }
+    .m-search-bar { background: rgba(21,101,192,.93); color: #fff; padding: 4px 8px; font-size: 10px; display: flex; align-items: center; gap: 4px; }
+    .m-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .m-preview-card { background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .m-preview-thumb { background: #f0f0f0; height: 100px; display: flex; align-items: center; justify-content: center; font-size: 28px; color: #aaa; }
+    .m-preview-info  { padding: 5px; }
+    .m-drawer { background: #fff; width: 200px; box-shadow: 2px 0 8px rgba(0,0,0,.2); }
+    .m-drawer-header { background: #fff; color: #000; padding: 10px 8px 0; border-bottom: 1px solid #e0e0e0; }
+    .m-drawer-title { font-weight: 700; font-size: 12px; margin-bottom: 6px; color: #000; }
+    .m-tabs { display: flex; border-bottom: 2px solid rgba(0,0,0,.15); }
+    .m-tab  { flex: 1; text-align: center; padding: 4px 0; font-size: 9px; cursor: pointer; color: rgba(0,0,0,.54); }
+    .m-tab.active { border-bottom: 2px solid #000; margin-bottom: -2px; color: #000; }
+    .m-outline-item { padding: 6px 12px; border-bottom: 1px solid #f0f0f0; font-size: 10px; }
+    .m-outline-item.l1 { padding-left: 24px; font-size: 9px; color: #555; }
+    .m-webview-bar { height: 44px; background: #fff; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; padding: 0 8px; gap: 4px; font-size: 11px; }
+    .m-webview-progress { height: 2px; background: #ffcccc; }
+    .m-webview-progress-inner { height: 100%; width: 60%; background: var(--red); }
+    .m-webview-body { background: #e8f5e9; height: 180px; padding: 8px; font-size: 10px; color: #333; }
+    .m-dialog-overlay { background: rgba(0,0,0,.3); padding: 16px; }
+    .m-dialog { background: #fff; border-radius: 8px; padding: 12px; font-size: 11px; }
+    .m-dialog-title { font-weight: 700; margin-bottom: 8px; font-size: 12px; }
+    .m-dialog-item { padding: 6px 0; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 6px; }
+    .m-dialog-item:last-child { border-bottom: none; }
+    .m-check { color: var(--red); font-size: 14px; }
+
+    /* ─── フロー ────────────────────────────────── */
+    .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .flow-box { background: var(--card); border: 2px solid var(--border); border-radius: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; text-align: center; }
+    .flow-box.start { border-color: var(--red); color: var(--red); }
+    .flow-box.page  { border-color: var(--blue); color: var(--blue); }
+    .flow-box.modal { border-color: #888; color: #555; border-style: dashed; }
+    .flow-arrow { font-size: 18px; color: var(--muted); }
+    .flow-label { font-size: 11px; color: var(--muted); }
+
+    /* ─── カラーパレット ─────────────────────────── */
+    .color-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0; }
+    .color-chip { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; min-width: 200px; }
+    .color-swatch { width: 32px; height: 32px; border-radius: 4px; border: 1px solid rgba(0,0,0,.1); flex-shrink: 0; }
+    .color-name { font-size: 12px; font-weight: 600; }
+    .color-hex  { font-size: 11px; color: var(--muted); font-family: monospace; }
+
+    /* ─── コードブロック ────────────────────────── */
+    code { font-family: "SF Mono", "Consolas", monospace; font-size: 12px; background: #f1f3f5; padding: 1px 5px; border-radius: 3px; }
+    pre  { background: #f1f3f5; border-radius: 6px; padding: 12px 16px; font-family: "SF Mono", "Consolas", monospace; font-size: 12px; overflow-x: auto; margin: 8px 0; }
+
+    /* ─── 注記 ──────────────────────────────────── */
+    .note { background: #fffbe6; border-left: 4px solid #ffc107; padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 13px; margin: 12px 0; }
+    .note-blue { background: #e8f0fe; border-left: 4px solid var(--blue); }
+    .note-red  { background: #ffeaea; border-left: 4px solid var(--red); }
+
+    @media print {
+      .section { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- ═══════════════════════ ヘッダー ═══════════════════════ -->
+  <div class="doc-header">
+    <h1>PDF アプリ 画面定義書</h1>
+    <p>Flutter製 PDFビューアーアプリの全画面・コンポーネント仕様</p>
+    <table class="meta-table">
+      <tr><td>作成日</td><td>2026-06-23</td></tr>
+      <tr><td>バージョン</td><td>6.1.0</td></tr>
+      <tr><td>Flutter</td><td>3.44.2 / Dart 3.12.2</td></tr>
+      <tr><td>対象OS</td><td>Android（iOS 未検証）</td></tr>
+    </table>
+  </div>
+
+  <!-- ═══════════════════════ 目次 ═══════════════════════════ -->
+  <div class="toc">
+    <h2>目次</h2>
+    <ol>
+      <li><a href="#s1">アプリ概要</a>
+        <ol>
+          <li><a href="#s1-1">画面遷移フロー</a></li>
+          <li><a href="#s1-2">カラーパレット・テーマ</a></li>
+          <li><a href="#s1-3">ファイル構成</a></li>
+        </ol>
+      </li>
+      <li><a href="#s2">コンテンツ一覧画面（ContentListPage）</a>
+        <ol>
+          <li><a href="#s2-1">画面レイアウト</a></li>
+          <li><a href="#s2-2">AppBar</a></li>
+          <li><a href="#s2-2a">フッター（テスト用ストレージ初期化）</a></li>
+          <li><a href="#s2-3">リスト表示カード（ContentListCard）</a></li>
+          <li><a href="#s2-4">プレビュー表示カード（ContentPreviewCard）</a></li>
+          <li><a href="#s2-5">ダイアログ</a></li>
+        </ol>
+      </li>
+      <li><a href="#s3">PDFビューアー画面（PdfViewerPage）</a>
+        <ol>
+          <li><a href="#s3-1">画面レイアウト</a></li>
+          <li><a href="#s3-2">トップバー（PdfTopBar）</a></li>
+          <li><a href="#s3-3">サムネイルストリップ（PdfThumbnailStrip）</a></li>
+          <li><a href="#s3-4">検索ナビバー（PdfSearchNavBar）</a></li>
+          <li><a href="#s3-5">サイドドロワー（PdfSideDrawer）</a></li>
+          <li><a href="#s3-6">検索ハイライト（PdfSearchHighlightOverlay）</a></li>
+          <li><a href="#s3-7">リンクオーバーレイ（PdfLinkOverlay）</a></li>
+          <li><a href="#s3-8">ズーム操作</a></li>
+        </ol>
+      </li>
+      <li><a href="#s4">WebView画面（WebViewPage）</a></li>
+      <li><a href="#s5">コントローラー・エンティティ</a>
+        <ol>
+          <li><a href="#s5-1">LocaleController</a></li>
+          <li><a href="#s5-2">ThemeController</a></li>
+          <li><a href="#s5-3">BookmarkController</a></li>
+          <li><a href="#s5-4">SearchController</a></li>
+          <li><a href="#s5-5">PdfContent エンティティ</a></li>
+        </ol>
+      </li>
+    </ol>
+  </div>
+
+
+  <!-- ═══════════════════════ 1. アプリ概要 ══════════════════ -->
+  <div class="section" id="s1">
+    <div class="section-title">1. アプリ概要</div>
+
+    <div class="card">
+      <p>サーバーからPDFをダウンロード・保存し、アプリ内で閲覧できる Flutter 製ビューアーアプリ。日英 2 言語・ライト／ダーク テーマに対応。キーワード検索・ブックマーク・PDF内リンク（InAppWebView）機能を持つ。</p>
+    </div>
+
+    <div class="sub-title" id="s1-1">1-1. 画面遷移フロー</div>
+    <div class="card">
+      <div class="flow">
+        <div class="flow-box start">起動</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box page">コンテンツ一覧<br><small>/</small></div>
+        <div class="flow-arrow">→ ダウンロード完了</div>
+        <div class="flow-box page">PDFビューアー<br><small>/viewer</small></div>
+        <div class="flow-arrow">→ PDF内リンクタップ</div>
+        <div class="flow-box page">WebView<br><small>/webview</small></div>
+      </div>
+      <div class="flow" style="margin-top:12px;">
+        <div class="flow-box page">コンテンツ一覧</div>
+        <div class="flow-arrow">→ テーマアイコン</div>
+        <div class="flow-box modal">テーマ切替ダイアログ</div>
+      </div>
+      <div class="flow">
+        <div class="flow-box page">コンテンツ一覧</div>
+        <div class="flow-arrow">→ 言語アイコン</div>
+        <div class="flow-box modal">言語切替ダイアログ</div>
+      </div>
+      <div class="flow">
+        <div class="flow-box page">PDFビューアー</div>
+        <div class="flow-arrow">→ メニューアイコン</div>
+        <div class="flow-box modal">サイドドロワー<br>（目次／ブックマーク／検索）</div>
+      </div>
+    </div>
+
+    <div class="sub-title" id="s1-2">1-2. カラーパレット・テーマ</div>
+    <div class="card">
+      <div class="color-row">
+        <div class="color-chip"><div class="color-swatch" style="background:#CC0000;"></div><div><div class="color-name">プライマリレッド</div><div class="color-hex">#CC0000</div></div></div>
+        <div class="color-chip"><div class="color-swatch" style="background:#8B0000;"></div><div><div class="color-name">ダーク用深紅（AppBar）</div><div class="color-hex">#8B0000 ※旧仕様</div></div></div>
+        <div class="color-chip"><div class="color-swatch" style="background:#ffffff; border:1px solid #ccc;"></div><div><div class="color-name">AppBar背景（ライト）</div><div class="color-hex">#FFFFFF</div></div></div>
+        <div class="color-chip"><div class="color-swatch" style="background:#1E1E1E;"></div><div><div class="color-name">AppBar背景（ダーク）</div><div class="color-hex">#1E1E1E</div></div></div>
+        <div class="color-chip"><div class="color-swatch" style="background:#1565C0;"></div><div><div class="color-name">検索ナビバー</div><div class="color-hex">#1565C0</div></div></div>
+      </div>
+
+      <table style="margin-top:16px;">
+        <tr><th>要素</th><th>ライトモード</th><th>ダークモード</th></tr>
+        <tr><td>AppBar 背景</td><td><code>#FFFFFF</code>（白）</td><td><code>#1E1E1E</code>（濃いグレー）</td></tr>
+        <tr><td>AppBar 文字・アイコン</td><td><code>#000000</code>（黒）</td><td><code>#FFFFFF</code>（白）</td></tr>
+        <tr><td>ElevatedButton</td><td>背景 <code>#CC0000</code> / 文字 白</td><td>同左</td></tr>
+        <tr><td>ProgressIndicator</td><td><code>#CC0000</code></td><td><code>#CC0000</code></td></tr>
+        <tr><td>TabBar（ドロワー内）</td><td>選択 <code>#000000</code>（黒）/ 非選択 <code>black54</code></td><td>選択 <code>#FFFFFF</code>（白）/ 非選択 <code>white60</code></td></tr>
+        <tr><td>PDFビューアー Scaffold 背景</td><td><code>#000000</code>（黒）</td><td><code>#000000</code>（黒）</td></tr>
+        <tr><td>PDFトップバー背景</td><td><code>#FFFFFF</code> 不透明度97%</td><td><code>#1E1E1E</code> 不透明度97%</td></tr>
+        <tr><td>ドロワーヘッダー背景</td><td><code>#FFFFFF</code>（白）</td><td><code>#1E1E1E</code>（濃いグレー）</td></tr>
+        <tr><td>ドロワーヘッダー文字・タブ色</td><td><code>#000000</code>（黒）</td><td><code>#FFFFFF</code>（白）</td></tr>
+        <tr><td>ブックマークアイコン（済）</td><td>アンバー（黄）</td><td>アンバー（黄）</td></tr>
+        <tr><td>PDFページ ダークモード</td><td>通常表示</td><td>RGBA反転カラーフィルター適用</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s1-3">1-3. ファイル構成</div>
+    <div class="card">
+      <pre>lib/
+├── main.dart                          # ルーティング・テーマ・エントリーポイント
+└── src/
+    ├── l10n.dart                      # 多言語文字列（ja / en）
+    ├── controllers/
+    │   ├── locale_controller.dart     # 言語 StateNotifier
+    │   ├── theme_controller.dart      # テーマ StateNotifier
+    │   ├── bookmark_controller.dart   # ブックマーク 永続化
+    │   └── search_controller.dart     # PDF全文検索ロジック
+    ├── entities/
+    │   ├── pdf_content.dart           # PdfContent モデル + ユーティリティ
+    │   └── search_match.dart          # SearchMatch typedef
+    ├── pages/
+    │   ├── content_list/
+    │   │   ├── content_list_page.dart # コンテンツ一覧画面
+    │   │   ├── content_list_card.dart # リスト表示カード
+    │   │   └── content_preview_card.dart # プレビュー表示カード
+    │   └── pdf_viewer/
+    │       ├── pdf_viewer_page.dart   # PDFビューアー画面（メイン）
+    │       ├── pdf_top_bar.dart       # カスタムトップバー
+    │       ├── pdf_thumbnail_strip.dart # 下部サムネイルストリップ
+    │       ├── pdf_search_nav_bar.dart  # 検索ナビゲーションバー
+    │       ├── pdf_search_highlight.dart # 検索ハイライトオーバーレイ
+    │       ├── pdf_link_overlay.dart  # PDFリンクタップオーバーレイ
+    │       ├── pdf_side_drawer.dart   # サイドドロワー（3タブ）
+    │       └── pdf_viewer_constants.dart # 定数定義
+    └── webview/
+        └── webview_page.dart          # インアプリWebView画面
+
+assets/
+└── contents.json                      # PDFコンテンツ定義（ja/en）</pre>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════ 2. コンテンツ一覧画面 ══════════ -->
+  <div class="section" id="s2">
+    <div class="section-title">2. コンテンツ一覧画面（ContentListPage）</div>
+
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>クラス名</td><td><code>ContentListPage extends HookConsumerWidget</code></td></tr>
+        <tr><td>ファイル</td><td><code>lib/src/pages/content_list/content_list_page.dart</code></td></tr>
+        <tr><td>ルートパス</td><td><code>/</code>（初期画面）</td></tr>
+        <tr><td>データソース</td><td><code>assets/contents.json</code>（言語コードのキーで取得）</td></tr>
+        <tr><td>状態管理</td><td><code>HookConsumerWidget</code>（hooks_riverpod）</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s2-1">2-1. 画面レイアウト</div>
+    <div class="mockup-wrap">
+      <!-- リスト表示モック -->
+      <div>
+        <div class="mockup">
+          <div class="m-status"><span>9:41</span><span>●●●</span></div>
+          <div class="m-appbar white">
+            <span style="flex:1;font-size:13px;">コンテンツ一覧</span>
+            <div class="m-appbar" style="padding:0;gap:0;height:auto;">
+              <div class="icon-btn">⊞</div>
+              <div class="icon-btn">☀</div>
+              <div class="icon-btn">🌐</div>
+            </div>
+          </div>
+          <div class="m-body" style="padding-bottom:0;">
+            <div class="m-card">
+              <div><span class="m-badge">ビジネス</span><span class="m-badge green" style="margin-left:4px;">✓ 保存済 23KB</span></div>
+              <div class="m-title">DX入門ガイド</div>
+              <div class="m-desc">デジタルトランスフォーメーションの基礎から実践まで解説…</div>
+              <div class="m-btn">📖 開く</div>
+            </div>
+            <div class="m-card">
+              <div><span class="m-badge">テクノロジー</span></div>
+              <div class="m-title">AI技術と社会の未来 2024年版</div>
+              <div class="m-desc">生成AI・産業影響・倫理規制・今後の展望を網羅…</div>
+              <div class="m-btn">⬇ ダウンロードして保存</div>
+            </div>
+            <div style="border-top:1px solid #ddd;padding:6px 4px;">
+              <div class="m-btn outline" style="color:#c00;border-color:#c00;font-size:9px;">🗑 ストレージを初期化 (テスト用)</div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-label">リスト表示</div>
+      </div>
+
+      <!-- プレビュー表示モック -->
+      <div>
+        <div class="mockup">
+          <div class="m-status"><span>9:41</span><span>●●●</span></div>
+          <div class="m-appbar white">
+            <span style="flex:1;font-size:13px;">コンテンツ一覧</span>
+            <div class="m-appbar" style="padding:0;gap:0;height:auto;">
+              <div class="icon-btn">☰</div>
+              <div class="icon-btn">☀</div>
+              <div class="icon-btn">🌐</div>
+            </div>
+          </div>
+          <div class="m-body">
+            <div class="m-grid">
+              <div class="m-preview-card">
+                <div class="m-preview-thumb">📄</div>
+                <div class="m-preview-info">
+                  <span class="m-badge">ビジネス</span>
+                  <div style="font-weight:700;font-size:9px;margin-top:2px;">DX入門ガイド</div>
+                  <div class="m-btn" style="margin-top:4px;font-size:9px;">開く</div>
+                </div>
+              </div>
+              <div class="m-preview-card">
+                <div class="m-preview-thumb" style="background:#e0e0e0;font-size:22px;color:#999;">📄</div>
+                <div class="m-preview-info">
+                  <span class="m-badge">テクノロジー</span>
+                  <div style="font-weight:700;font-size:9px;margin-top:2px;">AI技術と社会の未来</div>
+                  <div class="m-btn" style="margin-top:4px;font-size:9px;">ダウンロード</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-label">プレビュー表示</div>
+      </div>
+
+      <!-- ダウンロード中モック -->
+      <div>
+        <div class="mockup">
+          <div class="m-status"><span>9:41</span><span>●●●</span></div>
+          <div class="m-appbar white">
+            <span style="flex:1;font-size:13px;">コンテンツ一覧</span>
+          </div>
+          <div class="m-body">
+            <div class="m-card">
+              <div><span class="m-badge">テクノロジー</span></div>
+              <div class="m-title">AI技術と社会の未来 2024年版</div>
+              <div class="m-desc">生成AI・産業影響・倫理規制・今後の展望を網羅…</div>
+              <div style="background:#e0e0e0;border-radius:4px;height:6px;margin:4px 0;">
+                <div style="background:var(--red);width:62%;height:100%;border-radius:4px;"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:9px;color:#666;">
+                <span>ダウンロード中 62%</span>
+                <span style="color:var(--red);">キャンセル</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-label">ダウンロード中</div>
+      </div>
+    </div>
+
+    <div class="sub-title" id="s2-2">2-2. AppBar</div>
+    <div class="card">
+      <table>
+        <tr><th>要素</th><th>説明</th><th>動作</th></tr>
+        <tr><td>タイトル</td><td>"コンテンツ一覧" / "Content List"</td><td>—</td></tr>
+        <tr>
+          <td>表示切替ボタン</td>
+          <td>
+            リスト表示中: <code>grid_view</code> アイコン<br>
+            プレビュー表示中: <code>view_list</code> アイコン
+          </td>
+          <td><code>viewMode</code> を <code>list</code>↔<code>preview</code> でトグル</td>
+        </tr>
+        <tr>
+          <td>テーマボタン</td>
+          <td>
+            system: <code>brightness_auto</code><br>
+            light: <code>light_mode</code><br>
+            dark: <code>dark_mode</code>
+          </td>
+          <td>テーマ切替ダイアログを表示</td>
+        </tr>
+        <tr><td>言語ボタン</td><td><code>language</code> アイコン</td><td>言語切替ダイアログを表示</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s2-2a">2-2a. フッター（テスト用ストレージ初期化）</div>
+    <div class="card">
+      <div class="note note-red">このボタンはテスト目的専用です。本番ビルドでは削除することを推奨します。</div>
+      <table style="margin-top:12px;">
+        <tr><th>要素</th><th>仕様</th></tr>
+        <tr><td>配置</td><td>画面最下部（<code>Column</code> の末尾）。<code>Border(top: ...)</code> で上部に区切り線</td></tr>
+        <tr><td>ボタン種別</td><td><code>OutlinedButton.icon</code>（全幅）</td></tr>
+        <tr><td>アイコン</td><td><code>Icons.delete_sweep</code>（赤）</td></tr>
+        <tr><td>ラベル</td><td>"ストレージを初期化 (テスト用)"（赤）</td></tr>
+        <tr><td>ボタン枠色</td><td><code>Colors.red</code></td></tr>
+        <tr><td>タップ時の動作</td><td>①確認ダイアログ表示 → ②OKでストレージ初期化 → ③SnackBar表示 + カード状態リセット</td></tr>
+      </table>
+      <div class="sub2-title">確認ダイアログ</div>
+      <table>
+        <tr><th>要素</th><th>内容</th></tr>
+        <tr><td>タイトル</td><td>"ストレージを初期化"</td></tr>
+        <tr><td>本文</td><td>"ダウンロード済みPDFファイルとブックマークなど、すべてのデータを削除します。この操作は取り消せません。"</td></tr>
+        <tr><td>キャンセルボタン</td><td>処理を中断して閉じる</td></tr>
+        <tr><td>初期化ボタン（赤）</td><td>① <code>getApplicationDocumentsDirectory()</code> 配下の <code>.pdf</code> ファイルを全削除<br>② <code>SharedPreferences.clear()</code> で全キー削除<br>③ <code>reloadKey</code> をインクリメントしてカード状態を強制リセット</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title">2-2b. ボディ状態遷移</div>
+    <div class="card">
+      <table>
+        <tr><th>状態</th><th>表示内容</th></tr>
+        <tr><td><span class="badge badge-gray">loading</span></td><td><code>CircularProgressIndicator</code>（中央）</td></tr>
+        <tr><td><span class="badge badge-red">error</span></td><td>エラーメッセージテキスト（中央）</td></tr>
+        <tr><td><span class="badge badge-blue">list モード</span></td><td><code>ListView.separated</code>（padding:12, 間隔:8）→ <code>ContentListCard</code></td></tr>
+        <tr><td><span class="badge badge-blue">preview モード</span></td><td><code>GridView.builder</code>（2列, crossAxisSpacing:8, mainAxisSpacing:8, mainAxisExtent:300）→ <code>ContentPreviewCard</code></td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s2-3">2-3. リスト表示カード（ContentListCard）</div>
+    <div class="card">
+      <div class="sub2-title">プロパティ</div>
+      <table>
+        <tr><th>プロパティ</th><th>型</th><th>説明</th></tr>
+        <tr><td><code>content</code></td><td><code>PdfContent</code></td><td>表示するコンテンツ情報</td></tr>
+        <tr><td><code>langCode</code></td><td><code>String</code></td><td>現在の言語コード（保存パス生成に使用）</td></tr>
+      </table>
+      <div class="sub2-title">状態（Hooks）</div>
+      <table>
+        <tr><th>状態変数</th><th>型</th><th>初期値</th><th>説明</th></tr>
+        <tr><td><code>isDownloading</code></td><td><code>bool</code></td><td>false</td><td>ダウンロード処理中フラグ</td></tr>
+        <tr><td><code>progress</code></td><td><code>double</code></td><td>0.0</td><td>ダウンロード進捗（0.0〜1.0）</td></tr>
+        <tr><td><code>cancelToken</code></td><td><code>CancelToken</code></td><td>new</td><td>Dioキャンセルトークン（ダウンロードごとに再生成）</td></tr>
+        <tr><td><code>isDownloaded</code></td><td><code>bool</code></td><td>false</td><td>ローカルに保存済みかどうか</td></tr>
+        <tr><td><code>savedPath</code></td><td><code>String?</code></td><td>null</td><td>保存済みファイルのパス</td></tr>
+        <tr><td><code>fileSize</code></td><td><code>int?</code></td><td>null</td><td>保存済みファイルのバイト数</td></tr>
+      </table>
+      <div class="sub2-title">レイアウト仕様</div>
+      <table>
+        <tr><th>要素</th><th>仕様</th></tr>
+        <tr><td>カード</td><td>elevation:2、padding:16</td></tr>
+        <tr><td>カテゴリバッジ</td><td>bg: <code>primaryContainer</code>、radius:4、文字サイズ:11</td></tr>
+        <tr><td>保存済みバッジ</td><td>bg: <code>green.shade50</code>、枠: <code>green.shade300</code>、チェックアイコン付き、文字サイズ:10、ファイルサイズ表示</td></tr>
+        <tr><td>タイトル</td><td>fontSize:16、fontWeight:bold</td></tr>
+        <tr><td>説明文</td><td>fontSize:13、color: <code>onSurfaceVariant</code></td></tr>
+        <tr><td>削除ボタン</td><td>赤 <code>delete_outline</code> アイコン（保存済み時のみ表示、右上）</td></tr>
+        <tr><td>アクションボタン（全幅）</td><td>ダウンロード中: プログレスバー＋%表示＋キャンセルボタン<br>保存済み: 「📖 開く」ボタン<br>未保存: 「⬇ ダウンロードして保存」ボタン</td></tr>
+      </table>
+      <div class="sub2-title">動作仕様</div>
+      <table>
+        <tr><th>アクション</th><th>動作</th></tr>
+        <tr><td>「ダウンロードして保存」タップ</td><td>Dioで <code>content.url</code> からダウンロード→成功時 <code>/viewer</code> へ遷移（ファイルパス渡し）</td></tr>
+        <tr><td>「開く」タップ</td><td><code>context.go('/viewer', extra: savedPath)</code></td></tr>
+        <tr><td>「削除」タップ</td><td>確認ダイアログ表示→OKでファイル削除・状態リセット→SnackBar表示</td></tr>
+        <tr><td>「キャンセル」タップ</td><td><code>cancelToken.value.cancel()</code> → DioException(cancel)でサイレント終了</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s2-4">2-4. プレビュー表示カード（ContentPreviewCard）</div>
+    <div class="card">
+      <div class="sub2-title">レイアウト仕様（mainAxisExtent: 300px 固定）</div>
+      <table>
+        <tr><th>領域</th><th>仕様</th></tr>
+        <tr><td>カード全体</td><td>clipBehavior: <code>antiAlias</code>（サムネイルに角丸適用）</td></tr>
+        <tr>
+          <td>サムネイル領域（Expanded）</td>
+          <td>
+            <b>保存済み:</b> <code>PdfDocumentViewBuilder → ClipRect → OverflowBox(topCenter, maxHeight:∞) → AspectRatio(1/1.414) → PdfPageView(page:1, dpi:150)</code><br>
+            <b>未保存:</b> <code>#F0F0F0</code>（ダーク: <code>#2C2C2C</code>）背景＋<code>picture_as_pdf</code>アイコン(52px)＋"未ダウンロード"テキスト<br>
+            <b>ダウンロード中オーバーレイ:</b> 黒55%半透明＋円形プログレス(44px)＋%テキスト
+          </td>
+        </tr>
+        <tr>
+          <td>情報領域（固定）</td>
+          <td>
+            padding: <code>fromLTRB(8,6,8,8)</code><br>
+            Row: [カテゴリバッジ(10px)] [保存済みチェック green.shade600 if downloaded] [Spacer] [削除アイコン if downloaded]<br>
+            タイトル: 12px bold, maxLines:2, overflow:ellipsis<br>
+            アクション: ダウンロード中/保存済み/未保存で切り替え（ボタン高さ30px、文字12px）
+          </td>
+        </tr>
+      </table>
+      <div class="note">
+        <strong>A4比率表示の仕組み:</strong> <code>OverflowBox(maxHeight: double.infinity)</code> でページ全体を展開し、<code>AspectRatio(1/1.414)</code> でA4縦比率に固定、<code>ClipRect</code> で下部を切り取ることで、上部（タイトル・表紙部分）を最大幅で表示する。
+      </div>
+    </div>
+
+    <div class="sub-title" id="s2-5">2-5. ダイアログ</div>
+    <div class="mockup-wrap">
+      <!-- テーマダイアログ -->
+      <div>
+        <div class="mockup">
+          <div class="m-status"><span>9:41</span><span>●●●</span></div>
+          <div class="m-appbar white"><span>コンテンツ一覧</span></div>
+          <div class="m-body" style="padding:0;">
+            <div class="m-dialog-overlay">
+              <div class="m-dialog">
+                <div class="m-dialog-title">☀ テーマ</div>
+                <div class="m-dialog-item">⚙ システム設定 <span class="m-check" style="margin-left:auto;">✓</span></div>
+                <div class="m-dialog-item">🌞 ライト</div>
+                <div class="m-dialog-item">🌙 ダーク</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-label">テーマ切替ダイアログ</div>
+      </div>
+      <!-- 言語ダイアログ -->
+      <div>
+        <div class="mockup">
+          <div class="m-status"><span>9:41</span><span>●●●</span></div>
+          <div class="m-appbar white"><span>コンテンツ一覧</span></div>
+          <div class="m-body" style="padding:0;">
+            <div class="m-dialog-overlay">
+              <div class="m-dialog">
+                <div class="m-dialog-title">🌐 言語</div>
+                <div class="m-dialog-item">🇯🇵 日本語 <span class="m-check" style="margin-left:auto;">✓</span></div>
+                <div class="m-dialog-item">🇺🇸 English</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-label">言語切替ダイアログ</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="sub2-title">テーマ切替ダイアログ（showThemeModeDialog）</div>
+      <table>
+        <tr><th>選択肢</th><th>アイコン</th><th>動作</th></tr>
+        <tr><td>システム設定</td><td><code>brightness_auto</code></td><td><code>ref.read(themeModeProvider.notifier).set(ThemeMode.system)</code></td></tr>
+        <tr><td>ライト</td><td><code>light_mode</code></td><td><code>ThemeMode.light</code> を設定・永続化</td></tr>
+        <tr><td>ダーク</td><td><code>dark_mode</code></td><td><code>ThemeMode.dark</code> を設定・永続化</td></tr>
+      </table>
+      <p style="font-size:13px;color:var(--muted);margin-top:8px;">現在選択中の項目に <code>check_circle</code> アイコン（<code>primary</code> 色）を表示。</p>
+
+      <div class="sub2-title" style="margin-top:16px;">言語切替ダイアログ（showLanguageDialog）</div>
+      <table>
+        <tr><th>選択肢</th><th>フラグ</th><th>動作</th></tr>
+        <tr><td>日本語</td><td>🇯🇵</td><td><code>ref.read(localeProvider.notifier).setLocale(Locale('ja'))</code></td></tr>
+        <tr><td>English</td><td>🇺🇸</td><td><code>ref.read(localeProvider.notifier).setLocale(Locale('en'))</code></td></tr>
+      </table>
+      <p style="font-size:13px;color:var(--muted);margin-top:8px;">言語変更時に <code>contents.json</code> のコンテンツリストが再ロードされる。</p>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════ 3. PDFビューアー画面 ════════════ -->
+  <div class="section" id="s3">
+    <div class="section-title">3. PDFビューアー画面（PdfViewerPage）</div>
+
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>クラス名</td><td><code>PdfViewerPage extends HookConsumerWidget</code></td></tr>
+        <tr><td>ファイル</td><td><code>lib/src/pages/pdf_viewer/pdf_viewer_page.dart</code></td></tr>
+        <tr><td>ルートパス</td><td><code>/viewer</code>（<code>state.extra</code> でファイルパスを受取。null=ファイルピッカーを起動）</td></tr>
+        <tr><td>Scaffold背景</td><td><code>Colors.black</code>（常時黒）</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s3-1">3-1. 画面レイアウト（Stack構造）</div>
+    <div class="mockup-wrap">
+      <!-- PDFビューアー通常モック -->
+      <div>
+        <div class="mockup">
+          <div class="m-status" style="background:#111;"><span>9:41</span><span>●●●</span></div>
+          <div class="m-topbar white">
+            <span>←</span><span>☰</span>
+            <span class="spacer">dx_guide_jp.pdf</span>
+            <span style="font-size:10px;">3 / 8</span>
+            <span>🔖</span>
+          </div>
+          <div class="m-body black" style="padding:8px;">
+            <div class="m-pdf-page" style="height:180px;padding:6px;font-size:9px;color:#333;">
+              <div style="font-weight:700;font-size:11px;margin-bottom:4px;">DX入門ガイド</div>
+              <div style="font-size:8px;line-height:1.6;">第3章 デジタル変革の実践<br>3.1 組織変革のアプローチ<br><span style="background:rgba(255,255,0,.3);">キーワード検索</span>のハイライト例<br><br>リンクの例: <span style="color:#1565C0;text-decoration:underline;font-size:8px;">https://example.com</span></div>
+            </div>
+          </div>
+          <div class="m-thumb-row">
+            <div class="m-thumb"><div class="m-thumb-num">1</div></div>
+            <div class="m-thumb"><div class="m-thumb-num">2</div></div>
+            <div class="m-thumb active"><div class="m-thumb-num" style="color:#ff8080;font-weight:700;">3</div></div>
+            <div class="m-thumb"><div class="m-thumb-num">4</div></div>
+            <div class="m-thumb"><div class="m-thumb-num">5</div></div>
+          </div>
+        </div>
+        <div class="mockup-label">PDFビューアー（UI表示）</div>
+      </div>
+
+      <!-- 検索ナビバー表示モック -->
+      <div>
+        <div class="mockup">
+          <div class="m-status" style="background:#111;"><span>9:41</span><span>●●●</span></div>
+          <div class="m-topbar white">
+            <span>←</span><span>☰</span>
+            <span class="spacer">dx_guide_jp.pdf</span>
+            <span>🔖</span>
+          </div>
+          <div class="m-search-bar">
+            <span>✕</span>
+            <span style="flex:1;font-size:10px;">「デジタル」</span>
+            <span style="opacity:.7;font-size:10px;">3ページ</span>
+            <span>&lt;</span>
+            <span style="font-weight:700;font-size:11px;">2 / 5</span>
+            <span>&gt;</span>
+          </div>
+          <div class="m-body black" style="padding:8px;">
+            <div class="m-pdf-page" style="height:165px;padding:6px;font-size:9px;color:#333;">
+              <div style="font-size:8px;line-height:1.8;">
+                <span style="background:rgba(255,255,0,.3);">デジタル</span>変革の概念<br>
+                <span style="background:rgba(255,255,0,.75);padding:1px 2px;">デジタル</span>トランスフォーメーション<br>
+                <span style="background:rgba(255,255,0,.3);">デジタル</span>技術の活用方法
+              </div>
+            </div>
+          </div>
+          <div class="m-thumb-row">
+            <div class="m-thumb"><div class="m-thumb-num">1</div></div>
+            <div class="m-thumb active"><div class="m-thumb-num" style="color:#ff8080;font-weight:700;">2</div></div>
+          </div>
+        </div>
+        <div class="mockup-label">検索ヒット表示</div>
+      </div>
+
+      <!-- UI非表示モック -->
+      <div>
+        <div class="mockup">
+          <div class="m-status" style="background:#111;"><span>9:41</span><span>●●●</span></div>
+          <div class="m-body black" style="padding:8px;min-height:260px;">
+            <div class="m-pdf-page" style="height:240px;padding:6px;font-size:9px;color:#333;">
+              <div style="font-size:8px;line-height:1.6;">（タップするとUIが再表示）</div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-label">UI非表示（タップで切替）</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sub2-title">Stack レイヤー構造</div>
+      <table>
+        <tr><th>レイヤー順</th><th>ウィジェット</th><th>表示条件</th></tr>
+        <tr><td>①（最下層）</td><td><code>Positioned.fill</code> → <code>PdfDocumentViewBuilder</code>（ファイル未選択時は非表示）</td><td>常時配置</td></tr>
+        <tr><td>②</td><td><code>Positioned(top)</code> → AnimatedSlide → <code>PdfTopBar</code></td><td>常時配置（<code>isUiVisible</code> で上スライドアウト）</td></tr>
+        <tr><td>③</td><td><code>Positioned(top+kToolbarHeight)</code> → <code>PdfSearchNavBar</code></td><td><code>searchMatches.isNotEmpty</code> のとき</td></tr>
+        <tr><td>④（最上層）</td><td><code>Positioned(bottom)</code> → AnimatedSlide → <code>PdfThumbnailStrip</code></td><td>ファイル選択済み（<code>isUiVisible</code> で下スライドアウト）</td></tr>
+      </table>
+      <div class="note note-blue" style="margin-top:12px;">
+        <strong>UI表示切替:</strong> PDFをタップすると <code>isUiVisible</code> がトグルされ、トップバーとサムネイルストリップが <code>AnimatedSlide</code>（250ms）でスライドイン・アウトする。
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="sub2-title">主要な状態変数</div>
+      <table>
+        <tr><th>変数名</th><th>型</th><th>説明</th></tr>
+        <tr><td><code>selectedFile</code></td><td><code>File?</code></td><td>現在開いているPDFファイル</td></tr>
+        <tr><td><code>pageCount</code></td><td><code>int</code></td><td>総ページ数（0=未ロード）</td></tr>
+        <tr><td><code>currentPage</code></td><td><code>int</code></td><td>現在表示中のページ番号（1始まり）</td></tr>
+        <tr><td><code>outline</code></td><td><code>List&lt;PdfOutlineNode&gt;</code></td><td>PDF目次ノードリスト</td></tr>
+        <tr><td><code>bookmarks</code></td><td><code>Set&lt;int&gt;</code></td><td>ブックマーク済みページ番号セット</td></tr>
+        <tr><td><code>isUiVisible</code></td><td><code>bool</code></td><td>トップバー・サムネイル表示フラグ</td></tr>
+        <tr><td><code>searchQuery</code></td><td><code>String</code></td><td>現在の検索クエリ</td></tr>
+        <tr><td><code>searchMatches</code></td><td><code>List&lt;SearchMatch&gt;</code></td><td>検索ヒット一覧</td></tr>
+        <tr><td><code>searchIndex</code></td><td><code>int</code></td><td>現在フォーカスのヒットインデックス（0始まり）</td></tr>
+        <tr><td><code>transformController</code></td><td><code>TransformationController</code></td><td>ピンチズーム状態管理</td></tr>
+        <tr><td><code>isZoomed</code></td><td><code>bool</code></td><td>倍率>1.05のとき true（PageViewスワイプ制御）</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s3-2">3-2. トップバー（PdfTopBar）</div>
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>クラス</td><td><code>PdfTopBar extends StatelessWidget</code></td></tr>
+        <tr><td>実装</td><td>標準 AppBar ではなく <code>Container</code> ＋独自実装（Scaffold Stackにオーバーレイ）</td></tr>
+        <tr><td>高さ</td><td><code>kToolbarHeight + MediaQuery.padding.top</code>（ステータスバー分含む）</td></tr>
+        <tr><td>背景色（ライト）</td><td><code>Colors.white.withValues(alpha: 0.97)</code></td></tr>
+        <tr><td>背景色（ダーク）</td><td><code>Color(0xFF1E1E1E).withValues(alpha: 0.97)</code></td></tr>
+        <tr><td>アイコン・文字色（ライト）</td><td><code>Colors.black</code></td></tr>
+        <tr><td>アイコン・文字色（ダーク）</td><td><code>Colors.white</code></td></tr>
+      </table>
+      <div class="sub2-title">ボタン配置（Row）</div>
+      <table>
+        <tr><th>位置</th><th>アイコン</th><th>動作</th></tr>
+        <tr><td>左端</td><td><code>arrow_back</code></td><td><code>context.go('/')</code>（コンテンツ一覧に戻る）</td></tr>
+        <tr><td>左2番目</td><td><code>menu</code></td><td><code>scaffoldKey.currentState?.openDrawer()</code></td></tr>
+        <tr><td>中央（Expanded）</td><td>—</td><td>ファイル名テキスト（16px, w600, ellipsis）</td></tr>
+        <tr><td>右2番目（pageCount&gt;0時）</td><td>—</td><td>"N / M" ページ表示（14px）</td></tr>
+        <tr><td>右端（pageCount&gt;0時）</td><td><code>bookmark</code>/<code>bookmark_border</code></td><td>ブックマーク切替（済=アンバー、未=fgColor）</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s3-3">3-3. サムネイルストリップ（PdfThumbnailStrip）</div>
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>クラス</td><td><code>PdfThumbnailStrip extends StatelessWidget</code></td></tr>
+        <tr><td>コンテナ高さ</td><td><code>kPdfThumbnailHeight(100) + 32 = 132px</code></td></tr>
+        <tr><td>背景色</td><td><code>Colors.grey[850]</code></td></tr>
+        <tr><td>スクロール方向</td><td>水平（横スクロール）</td></tr>
+        <tr><td>サムネイルサイズ</td><td>幅: <code>kPdfThumbnailWidth = 70px</code></td></tr>
+        <tr><td>DPI</td><td>72（低解像度で高速レンダリング）</td></tr>
+        <tr><td>ダークモード</td><td><code>kPdfInvertColorFilter</code> を適用（色反転）</td></tr>
+      </table>
+      <div class="sub2-title">各サムネイルアイテム</div>
+      <table>
+        <tr><th>要素</th><th>仕様</th></tr>
+        <tr><td>外枠</td><td>現在ページ: <code>kPdfRedPrimary</code> 2px ボーダー / 他: transparent</td></tr>
+        <tr><td>ブックマークアイコン</td><td>右上に <code>bookmark</code> アンバー 14px（ブックマーク済みのみ）</td></tr>
+        <tr><td>ページ番号ラベル</td><td>下部に <code>black54</code> 背景 / 10px / 現在ページ: <code>red[200]</code> + bold</td></tr>
+        <tr><td>タップ動作</td><td><code>onPageTap(pageNum)</code> → PageView アニメーション移動（300ms easeInOut）</td></tr>
+        <tr><td>自動スクロール</td><td>ページ変更時に現在ページが中央に来るよう <code>animateTo</code>（300ms easeInOut）</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s3-4">3-4. 検索ナビバー（PdfSearchNavBar）</div>
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>クラス</td><td><code>PdfSearchNavBar extends StatelessWidget</code></td></tr>
+        <tr><td>表示条件</td><td><code>searchMatches.isNotEmpty</code></td></tr>
+        <tr><td>背景色</td><td><code>Color(0xFF1565C0).withValues(alpha: 0.93)</code>（青）</td></tr>
+        <tr><td>位置</td><td>トップバー直下（<code>top + kToolbarHeight + padding.top</code>）</td></tr>
+      </table>
+      <div class="sub2-title">Row 要素</div>
+      <table>
+        <tr><th>要素</th><th>仕様</th></tr>
+        <tr><td><code>close</code> アイコン（白 20px）</td><td>検索クリア（<code>searchQuery</code>・<code>searchMatches</code> をリセット）</td></tr>
+        <tr><td>クエリテキスト（Expanded）</td><td>「{query}」白 13px w500 ellipsis</td></tr>
+        <tr><td>ページ数テキスト</td><td>"N ページ" 白70% 12px</td></tr>
+        <tr><td><code>chevron_left</code></td><td>前のヒットへ（循環）。totalCount≤1 で無効</td></tr>
+        <tr><td>現在位置テキスト</td><td>"M / N" 白 13px bold</td></tr>
+        <tr><td><code>chevron_right</code></td><td>次のヒットへ（循環）。totalCount≤1 で無効</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s3-5">3-5. サイドドロワー（PdfSideDrawer）</div>
+    <div class="mockup-wrap">
+      <!-- 目次タブ -->
+      <div>
+        <div class="mockup">
+          <div class="m-status"><span>9:41</span><span>●●●</span></div>
+          <div class="m-drawer">
+            <div class="m-drawer-header">
+              <div class="m-drawer-title">メニュー</div>
+              <div class="m-tabs">
+                <div class="m-tab active">📋 目次</div>
+                <div class="m-tab">🔖 ブック</div>
+                <div class="m-tab">🔍 検索</div>
+              </div>
+            </div>
+            <div class="m-outline-item" style="font-weight:700;">第1章 DXの概要</div>
+            <div class="m-outline-item l1">1.1 デジタル変革とは</div>
+            <div class="m-outline-item l1">1.2 変革の背景</div>
+            <div class="m-outline-item" style="font-weight:700;">第2章 実践アプローチ</div>
+            <div class="m-outline-item l1">2.1 組織設計</div>
+          </div>
+        </div>
+        <div class="mockup-label">サイドドロワー（目次）</div>
+      </div>
+      <!-- 検索タブ -->
+      <div>
+        <div class="mockup">
+          <div class="m-status"><span>9:41</span><span>●●●</span></div>
+          <div class="m-drawer">
+            <div class="m-drawer-header">
+              <div class="m-drawer-title">メニュー</div>
+              <div class="m-tabs">
+                <div class="m-tab">📋 目次</div>
+                <div class="m-tab">🔖 ブック</div>
+                <div class="m-tab active">🔍 検索</div>
+              </div>
+            </div>
+            <div style="padding:8px;">
+              <div style="border:1px solid #ccc;border-radius:4px;padding:6px;display:flex;align-items:center;font-size:11px;gap:4px;">
+                🔍 <input style="border:none;outline:none;font-size:11px;flex:1;" placeholder="キーワードを入力..." readonly>
+              </div>
+              <div style="text-align:center;padding:16px;font-size:11px;color:#666;">
+                <div style="display:inline-block;width:20px;height:20px;border:2px solid var(--red);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>
+                <div style="margin-top:6px;">検索中...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-label">サイドドロワー（検索中）</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>クラス</td><td><code>PdfSideDrawer extends StatefulWidget</code></td></tr>
+        <tr><td>ドロワーヘッダー背景（ライト）</td><td><code>#FFFFFF</code>（白）</td></tr>
+        <tr><td>ドロワーヘッダー背景（ダーク）</td><td><code>#1E1E1E</code>（濃いグレー）</td></tr>
+        <tr><td>タブ数</td><td>3タブ（目次・ブックマーク・検索）</td></tr>
+        <tr><td>TabBar 色（ライト）</td><td>選択: <code>#000000</code>（黒）、非選択: <code>black54</code>、インジケーター: 黒</td></tr>
+        <tr><td>TabBar 色（ダーク）</td><td>選択: <code>#FFFFFF</code>（白）、非選択: <code>white60</code>、インジケーター: 白</td></tr>
+      </table>
+      <div class="sub2-title">タブ① 目次</div>
+      <table>
+        <tr><th>状態</th><th>表示</th></tr>
+        <tr><td>目次あり</td><td><code>PdfOutlineItem</code> の再帰リスト（深さに応じ 16px ずつインデント）</td></tr>
+        <tr><td>目次なし</td><td>"目次がありません" テキスト（中央）</td></tr>
+      </table>
+      <p style="font-size:13px;margin-top:8px;"><code>PdfOutlineItem</code>: 子ノードがある場合は展開/折りたたみボタン付き。タップで該当ページへジャンプし、ドロワーを閉じる。depth=0 は w600 bold。</p>
+
+      <div class="sub2-title" style="margin-top:16px;">タブ② ブックマーク</div>
+      <table>
+        <tr><th>状態</th><th>表示</th></tr>
+        <tr><td>ブックマークあり</td><td>ページ番号昇順ソートの ListTile（アンバーブックマークアイコン）＋削除ボタン</td></tr>
+        <tr><td>ブックマークなし</td><td>"ブックマークがありません" テキスト（中央）</td></tr>
+      </table>
+      <p style="font-size:13px;margin-top:8px;">タップで該当ページへジャンプし、ドロワーを閉じる。削除ボタンで <code>onBookmarkDelete(page)</code> を呼び出し SharedPreferences を更新。</p>
+
+      <div class="sub2-title" style="margin-top:16px;">タブ③ 検索</div>
+      <table>
+        <tr><th>要素</th><th>仕様</th></tr>
+        <tr><td>TextField</td><td>prefix: <code>search</code> アイコン / suffix: ローディング or クリアアイコン<br><code>textInputAction: search</code> / <code>onSubmitted</code> で検索実行<br><code>onChanged</code> では検索を実行せず "見つからない" メッセージのみクリア</td></tr>
+        <tr><td>検索中表示</td><td><code>CircularProgressIndicator</code>（18px, strokeWidth:2）＋"検索中..." テキスト</td></tr>
+        <tr><td>0件表示</td><td>"一致するページがありません" 赤テキスト</td></tr>
+        <tr><td>検索成功</td><td>ドロワーを閉じ、1件目のヒットページへ遷移</td></tr>
+      </table>
+      <div class="note" style="margin-top:12px;">
+        <strong>検索キャンセル制御:</strong> <code>_searchGen</code> カウンターをインクリメントし、<code>isCancelled: () =&gt; _searchGen != myGen</code> コールバックで旧検索を無効化。ドロワー破棄時にも <code>_searchGen++</code> でキャンセル。
+      </div>
+    </div>
+
+    <div class="sub-title" id="s3-6">3-6. 検索ハイライト（PdfSearchHighlightOverlay）</div>
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>クラス</td><td><code>PdfSearchHighlightOverlay extends StatefulWidget</code></td></tr>
+        <tr><td>ハイライト（全ヒット）</td><td><code>Colors.yellow.withValues(alpha: 0.30)</code></td></tr>
+        <tr><td>ハイライト（現在フォーカス）</td><td><code>Colors.yellow.withValues(alpha: 0.75)</code></td></tr>
+        <tr><td>座標変換</td><td><code>PdfTextRangeWithFragments.fromTextRange()</code> → <code>bounds.toRect(page, scaledPageSize)</code></td></tr>
+        <tr><td>再ロード条件</td><td>page / query / pageSize / activeMatch.charStart のいずれかが変化したとき</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s3-7">3-7. リンクオーバーレイ（PdfLinkOverlay）</div>
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>クラス</td><td><code>PdfLinkOverlay extends StatefulWidget</code></td></tr>
+        <tr><td>リンク取得</td><td><code>page.loadLinks()</code> で非同期取得</td></tr>
+        <tr><td>タップ領域</td><td>各リンクの PDF 座標を画面座標に変換し <code>Positioned</code> + <code>GestureDetector</code> で覆う</td></tr>
+        <tr><td>視覚表示</td><td>bg: <code>blue.withValues(alpha: 0.08)</code> / 枠: <code>blue.withValues(alpha: 0.3)</code> 0.5px</td></tr>
+        <tr><td>URL リンクタップ</td><td><code>onUrlLink(url)</code> → 親で <code>Navigator.push(WebViewPage(url))</code></td></tr>
+        <tr><td>内部リンクタップ</td><td><code>onDestLink(dest)</code> → 親で <code>goToPage(dest.pageNumber)</code></td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s3-8">3-8. ズーム操作</div>
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>実装ウィジェット</td><td><code>InteractiveViewer</code></td></tr>
+        <tr><td>最小倍率</td><td>1.0×（縮小不可）</td></tr>
+        <tr><td>最大倍率</td><td>5.0×</td></tr>
+        <tr><td>操作方法</td><td>2本指ピンチで拡大縮小 / 拡大中は1本指でパン</td></tr>
+        <tr><td>TransformationController</td><td>ページ間で共有。ページ遷移時に <code>Matrix4.identity()</code> でリセット</td></tr>
+        <tr><td>PageView 連携</td><td>倍率 &gt; 1.05 のとき <code>NeverScrollableScrollPhysics</code>（スワイプ無効）<br>倍率 ≤ 1.05 のとき <code>PageScrollPhysics</code>（スワイプ有効）</td></tr>
+      </table>
+      <div class="note note-blue" style="margin-top:12px;">
+        拡大中はページスワイプが無効になるため、ページを移動するには先に2本指ピンチで1.0×まで縮小する必要がある。
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════ 4. WebView画面 ══════════════════ -->
+  <div class="section" id="s4">
+    <div class="section-title">4. WebView画面（WebViewPage）</div>
+
+    <div class="mockup-wrap">
+      <div>
+        <div class="mockup">
+          <div class="m-status"><span>9:41</span><span>●●●</span></div>
+          <div class="m-webview-bar">
+            <span>←</span>
+            <span style="flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Example - サンプルページ</span>
+            <span style="font-size:16px;">🌐</span>
+          </div>
+          <div class="m-webview-progress">
+            <div class="m-webview-progress-inner"></div>
+          </div>
+          <div class="m-webview-body">
+            <p>ロード中のWebページコンテンツが表示されます</p>
+          </div>
+        </div>
+        <div class="mockup-label">WebView（読み込み中）</div>
+      </div>
+      <div>
+        <div class="mockup">
+          <div class="m-status"><span>9:41</span><span>●●●</span></div>
+          <div class="m-webview-bar">
+            <span>←</span>
+            <span style="flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Example - サンプルページ</span>
+            <span style="font-size:16px;">🌐</span>
+          </div>
+          <div class="m-webview-body">
+            <p style="font-weight:700;">Webページコンテンツ</p>
+            <p style="margin-top:8px;font-size:10px;">JavaScriptが有効な状態でページを表示します。</p>
+          </div>
+        </div>
+        <div class="mockup-label">WebView（読み込み完了）</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>クラス名</td><td><code>WebViewPage extends StatefulWidget</code></td></tr>
+        <tr><td>ファイル</td><td><code>lib/src/webview/webview_page.dart</code></td></tr>
+        <tr><td>ルートパス</td><td><code>/webview</code>（<code>state.extra</code> で URL 文字列を受取）</td></tr>
+        <tr><td>使用パッケージ</td><td><code>flutter_inappwebview ^6.1.5</code>（<code>InAppWebView</code> ウィジェット）</td></tr>
+        <tr><td>JavaScript</td><td><code>javaScriptEnabled: true</code>（<code>InAppWebViewSettings</code> 経由）</td></tr>
+      </table>
+      <div class="sub2-title">AppBar 仕様</div>
+      <table>
+        <tr><th>要素</th><th>仕様</th></tr>
+        <tr><td>タイトル</td><td>ページタイトル取得後は <code>getTitle()</code> の値、取得前は URL 文字列（ellipsis）</td></tr>
+        <tr><td>ブラウザで開くボタン</td><td><code>open_in_browser</code> アイコン → SnackBar で URL を表示</td></tr>
+        <tr>
+          <td>プログレスバー（AppBar bottom）</td>
+          <td>
+            読み込み中のみ <code>PreferredSize(height:2)</code> + <code>LinearProgressIndicator</code><br>
+            bg: <code>#AA0000</code> / value: <code>Colors.white</code>
+          </td>
+        </tr>
+      </table>
+      <div class="sub2-title">状態変数</div>
+      <table>
+        <tr><th>変数</th><th>型</th><th>説明</th></tr>
+        <tr><td><code>_controller</code></td><td><code>InAppWebViewController?</code></td><td>WebView 操作コントローラー（<code>onWebViewCreated</code> で取得）</td></tr>
+        <tr><td><code>_isLoading</code></td><td><code>bool</code></td><td>読み込み中フラグ（プログレスバー表示制御）</td></tr>
+        <tr><td><code>_title</code></td><td><code>String</code></td><td>ページタイトル（<code>onLoadStop</code> で <code>getTitle()</code> を呼び取得）</td></tr>
+        <tr><td><code>_progress</code></td><td><code>double</code></td><td>読み込み進捗 0.0〜1.0（<code>onProgressChanged</code> で更新）</td></tr>
+      </table>
+      <div class="sub2-title">主要コールバック</div>
+      <table>
+        <tr><th>コールバック</th><th>動作</th></tr>
+        <tr><td><code>onWebViewCreated</code></td><td><code>_controller</code> を保持</td></tr>
+        <tr><td><code>onLoadStart</code></td><td><code>_isLoading = true</code></td></tr>
+        <tr><td><code>onProgressChanged</code></td><td><code>_progress = progress / 100.0</code></td></tr>
+        <tr><td><code>onLoadStop</code></td><td><code>_isLoading = false</code>・<code>_title = getTitle()</code></td></tr>
+        <tr><td><code>onReceivedError</code></td><td><code>_isLoading = false</code></td></tr>
+      </table>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════ 5. コントローラー・エンティティ ═ -->
+  <div class="section" id="s5">
+    <div class="section-title">5. コントローラー・エンティティ</div>
+
+    <div class="sub-title" id="s5-1">5-1. LocaleController</div>
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>クラス</td><td><code>LocaleController extends StateNotifier&lt;Locale&gt;</code></td></tr>
+        <tr><td>Provider</td><td><code>localeProvider = StateNotifierProvider&lt;LocaleController, Locale&gt;</code></td></tr>
+        <tr><td>サポート言語</td><td><code>supportedLocales = [Locale('ja'), Locale('en')]</code></td></tr>
+        <tr><td>初期化優先度</td><td>① SharedPreferences の <code>'app_locale'</code> → ② システムロケール → ③ <code>Locale('ja')</code></td></tr>
+        <tr><td>永続化</td><td><code>setLocale(Locale)</code> で状態更新 ＋ SharedPreferences に言語コードを保存</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s5-2">5-2. ThemeController</div>
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>クラス</td><td><code>ThemeController extends StateNotifier&lt;ThemeMode&gt;</code></td></tr>
+        <tr><td>Provider</td><td><code>themeModeProvider = StateNotifierProvider&lt;ThemeController, ThemeMode&gt;</code></td></tr>
+        <tr><td>デフォルト</td><td><code>ThemeMode.system</code></td></tr>
+        <tr><td>永続化</td><td>SharedPreferences キー <code>'theme_mode'</code> に <code>mode.name</code>（"system" / "light" / "dark"）を保存</td></tr>
+        <tr><td>メソッド</td><td><code>set(ThemeMode)</code>：状態更新 ＋ 永続化</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s5-3">5-3. BookmarkController</div>
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>ファイル</td><td><code>lib/src/controllers/bookmark_controller.dart</code></td></tr>
+        <tr><td>実装形態</td><td>StateNotifier ではなくトップレベル関数（簡易実装）</td></tr>
+        <tr><td>SharedPreferences キー</td><td><code>'bm_${filePath.hashCode}'</code>（ファイルごとに別キー）</td></tr>
+        <tr><td><code>loadBookmarks(filePath)</code></td><td>JSON 文字列デコード → <code>Set&lt;int&gt;</code> を返す</td></tr>
+        <tr><td><code>saveBookmarks(filePath, pages)</code></td><td><code>Set&lt;int&gt;</code> → JSON エンコード → SharedPreferences に保存</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s5-4">5-4. SearchController</div>
+    <div class="card">
+      <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>ファイル</td><td><code>lib/src/controllers/search_controller.dart</code></td></tr>
+        <tr><td>関数名</td><td><code>performPdfSearch({query, filePath, isCancelled})</code></td></tr>
+        <tr><td>戻り値</td><td><code>Future&lt;List&lt;SearchMatch&gt;&gt;</code></td></tr>
+        <tr><td>PdfDocument</td><td>ビューアーとは独立した <code>PdfDocument.openFile(filePath)</code> を開く（常に <code>dispose()</code>）</td></tr>
+        <tr><td>検索ロジック</td><td>全ページを順番に <code>page.loadText()</code> → 正規表現マッチ → <code>SearchMatch</code> を追加</td></tr>
+        <tr><td>キャンセル</td><td>ページごとに <code>isCancelled()</code> を確認。true なら即座に return</td></tr>
+      </table>
+    </div>
+
+    <div class="sub-title" id="s5-5">5-5. PdfContent エンティティ</div>
+    <div class="card">
+      <div class="sub2-title">PdfContent クラス</div>
+      <table>
+        <tr><th>フィールド</th><th>型</th><th>説明</th></tr>
+        <tr><td><code>id</code></td><td><code>String</code></td><td>コンテンツ一意ID（ファイル名生成に使用）</td></tr>
+        <tr><td><code>title</code></td><td><code>String</code></td><td>表示タイトル</td></tr>
+        <tr><td><code>description</code></td><td><code>String</code></td><td>概要説明文</td></tr>
+        <tr><td><code>category</code></td><td><code>String</code></td><td>カテゴリー名（バッジ表示）</td></tr>
+        <tr><td><code>url</code></td><td><code>String</code></td><td>PDFダウンロードURL</td></tr>
+      </table>
+      <div class="sub2-title">ユーティリティ関数</div>
+      <table>
+        <tr><th>関数</th><th>説明</th></tr>
+        <tr><td><code>buildSavePath(dir, content, langCode)</code></td><td>タイトルから記号除去・スペース→アンダースコアに変換し <code>{id}_{langCode}_{sanitized}.pdf</code> のパスを生成</td></tr>
+        <tr><td><code>formatFileSize(bytes)</code></td><td>バイト数を "B" / "KB" / "MB" の文字列に変換</td></tr>
+      </table>
+      <div class="sub2-title">SearchMatch typedef</div>
+      <pre>typedef SearchMatch = ({int pageNumber, int charStart, int charEnd});</pre>
+
+      <div class="sub2-title">contents.json 構造</div>
+      <pre>{
+  "ja": [
+    { "id": "1", "title": "DX入門ガイド", "category": "ビジネス",
+      "description": "...", "url": "http://localhost:8765/dx_guide_jp.pdf" },
+    { "id": "2", "title": "AI技術と社会の未来 2024年版", "category": "テクノロジー",
+      "description": "...", "url": "http://localhost:8765/ai_society_report.pdf" }
+  ],
+  "en": [
+    { "id": "1", "title": "DX Beginner's Guide", "category": "Business",
+      "description": "...", "url": "http://localhost:8765/dx_guide_en.pdf" },
+    { "id": "2", "title": "AI Technology and Society 2024", "category": "Technology",
+      "description": "...", "url": "http://localhost:8765/ai_society_en.pdf" }
+  ]
+}</pre>
+      <div class="note note-red">
+        URL は <code>http://localhost:8765/</code> を使用。実機・エミュレーター接続時は <code>adb reverse tcp:8765 tcp:8765</code> を実行すること。
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;color:var(--muted);font-size:12px;padding-top:32px;border-top:1px solid var(--border);">
+    PDF アプリ 画面定義書 v6.1.0 — 生成日: 2026-06-23
+  </div>
+
+</div>
+</body>
+</html>
