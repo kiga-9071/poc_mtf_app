@@ -21,9 +21,23 @@ fvm flutter pub get
 ```bash
 # iOS シミュレータ
 flutter run -d ios
+# FVM の場合
+fvm flutter run -d ios
 
 # Android エミュレータ / 実機
 flutter run -d android
+# FVM の場合
+fvm flutter run -d android
+```
+
+### 接続済みデバイスを選択
+
+```bash
+flutter devices          # デバイス一覧を確認
+flutter run -d <device-id>
+# FVM の場合
+fvm flutter devices
+fvm flutter run -d <device-id>
 ```
 
 ## ソースモード切替
