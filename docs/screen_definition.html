@@ -331,7 +331,7 @@ assets/
         <tr><td>クラス名</td><td><code>ContentListPage extends HookConsumerWidget</code></td></tr>
         <tr><td>ファイル</td><td><code>lib/src/pages/content_list/content_list_page.dart</code></td></tr>
         <tr><td>ルートパス</td><td><code>/</code>（初期画面）</td></tr>
-        <tr><td>データソース</td><td><code>assets/contents.json</code>（言語コードのキーで取得）</td></tr>
+        <tr><td>データソース</td><td><code>packages/mock_server/assets/contents.json</code>（言語コードのキーで取得）</td></tr>
         <tr><td>状態管理</td><td><code>HookConsumerWidget</code>（hooks_riverpod）</td></tr>
       </table>
     </div>
@@ -1102,19 +1102,19 @@ assets/
       <pre>{
   "ja": [
     { "id": "1", "title": "DX入門ガイド", "category": "ビジネス",
-      "description": "...", "url": "http://localhost:8765/dx_guide_jp.pdf" },
+      "description": "...", "url": "http://127.0.0.1:8765/dx_guide_jp.pdf" },
     { "id": "2", "title": "AI技術と社会の未来 2024年版", "category": "テクノロジー",
-      "description": "...", "url": "http://localhost:8765/ai_society_report.pdf" }
+      "description": "...", "url": "http://127.0.0.1:8765/ai_society_report.pdf" }
   ],
   "en": [
     { "id": "1", "title": "DX Beginner's Guide", "category": "Business",
-      "description": "...", "url": "http://localhost:8765/dx_guide_en.pdf" },
+      "description": "...", "url": "http://127.0.0.1:8765/dx_guide_en.pdf" },
     { "id": "2", "title": "AI Technology and Society 2024", "category": "Technology",
-      "description": "...", "url": "http://localhost:8765/ai_society_en.pdf" }
+      "description": "...", "url": "http://127.0.0.1:8765/ai_society_en.pdf" }
   ]
 }</pre>
       <div class="note note-red">
-        URL は <code>http://localhost:8765/</code> を使用。実機・エミュレーター接続時は <code>adb reverse tcp:8765 tcp:8765</code> を実行すること。
+        URL は <code>http://127.0.0.1:8765/</code> を使用。アプリ内サーバー方式のため外部サーバー起動や <code>adb reverse</code> は不要。
       </div>
     </div>
   </div>
