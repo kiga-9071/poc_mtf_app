@@ -5,6 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'dart:ui' as ui;
+
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
 
 import '../../controllers/bookmark_controller.dart';
@@ -14,6 +19,7 @@ import '../../l10n.dart';
 import '../pdf_viewer/pdf_viewer_constants.dart';
 import 'pdf_link_overlay.dart';
 import 'pdf_search_highlight.dart';
+import 'pdf_tts_highlight.dart';
 import 'pdf_search_nav_bar.dart';
 import 'pdf_mini_map.dart';
 import 'pdf_side_drawer.dart';
@@ -43,6 +49,9 @@ class PdfViewerPage extends HookConsumerWidget {
     // Scaffold の Key: ドロワーをコードから開閉するために必要
     final scaffoldKey = useMemoized(() => GlobalKey<ScaffoldState>());
 
+    // ビューアー起動時刻（PDFロードにかかった時間の計測用）
+    final viewerOpenedAt = useMemoized(() => DateTime.now());
+
     // 現在開いているPDFファイル（null = ファイル未選択）
     final selectedFile = useState<File?>(null);
     // 総ページ数（0 = 未ロード）
@@ -65,6 +74,14 @@ class PdfViewerPage extends HookConsumerWidget {
     final searchMatches = useState<List<SearchMatch>>([]);
     // 現在フォーカスされている検索ヒットのインデックス（0始まり）
     final searchIndex = useState<int>(0);
+
+    // TTS（読み上げ）のステータス
+    final ttsStatus = useState(TtsStatus.idle);
+    // TTS 読み上げ中の現在単語ハイライト範囲（文字インデックス）
+    final ttsHighlightStart = useState<int?>(null);
+    final ttsHighlightEnd = useState<int?>(null);
+    // TTS 読み上げ中ページのテキストキャッシュ（ハイライト座標変換に使用）
+    final ttsPageText = useState<PdfPageText?>(null);
 
     // ピンチズーム用コントローラー。
     // 倍率を監視して PageView のスワイプと干渉しないよう制御する。
@@ -116,6 +133,49 @@ class PdfViewerPage extends HookConsumerWidget {
       snapAnimController.addListener(onSnap);
       return () => snapAnimController.removeListener(onSnap);
     }, [snapAnimController]);
+
+    // ダブルタップズーム用アニメーションコントローラー
+    final doubleTapZoomController = useAnimationController(
+      duration: const Duration(milliseconds: 250),
+    );
+    final doubleTapStartMatrix = useRef<Matrix4?>(null);
+    final doubleTapTargetMatrix = useRef<Matrix4?>(null);
+    // ダブルタップした座標（ズームの中心点として使用）
+    final doubleTapPosition = useRef<Offset>(Offset.zero);
+
+    useEffect(() {
+      void onDoubleTapZoom() {
+        final start = doubleTapStartMatrix.value;
+        final target = doubleTapTargetMatrix.value;
+        if (start == null || target == null) return;
+        final t = Curves.easeInOut.transform(doubleTapZoomController.value);
+        transformController.value =
+            Matrix4Tween(begin: start, end: target).lerp(t);
+      }
+      doubleTapZoomController.addListener(onDoubleTapZoom);
+      return () => doubleTapZoomController.removeListener(onDoubleTapZoom);
+    }, [doubleTapZoomController]);
+
+    // TTS インスタンス（ウィジェットのライフサイクルで一度だけ生成）
+    final tts = useMemoized(() => FlutterTts());
+
+    useEffect(() {
+      void resetTts() {
+        ttsStatus.value = TtsStatus.idle;
+        ttsHighlightStart.value = null;
+        ttsHighlightEnd.value = null;
+        ttsPageText.value = null;
+      }
+      tts.setCompletionHandler(resetTts);
+      tts.setCancelHandler(resetTts);
+      tts.setErrorHandler((_) => resetTts());
+      // 読み上げ中の単語位置をハイライト更新する
+      tts.setProgressHandler((_, start, end, __) {
+        ttsHighlightStart.value = start;
+        ttsHighlightEnd.value = end;
+      });
+      return () { tts.stop(); };
+    }, []);
 
     // テキスト選択オーバーレイ用の共有マップ（ページをまたいで選択状態を管理）
     final selectables =
@@ -170,14 +230,138 @@ class PdfViewerPage extends HookConsumerWidget {
       return null;
     }, [currentPage.value]);
 
+    // ページが変わったら読み上げを停止する
+    useEffect(() {
+      if (ttsStatus.value != TtsStatus.idle) {
+        tts.stop();
+        ttsStatus.value = TtsStatus.idle;
+        ttsHighlightStart.value = null;
+        ttsHighlightEnd.value = null;
+        ttsPageText.value = null;
+      }
+      return null;
+    }, [currentPage.value]);
+
+    /// ダブルタップでズームイン（2x）／ズームアウト（1x）を切り替える。
+    /// タップ位置を中心にアニメーションする。
+    void handleDoubleTap() {
+      snapAnimController.stop();
+      final isZoomed = transformController.value.getMaxScaleOnAxis() > 1.5;
+      doubleTapStartMatrix.value = transformController.value.clone();
+      if (isZoomed) {
+        doubleTapTargetMatrix.value = Matrix4.identity();
+      } else {
+        const scale = 2.0;
+        final f = doubleTapPosition.value;
+        // T(f) * S(scale) * T(-f) を展開した行列:
+        // 変換成分 = f * (1 - scale) で焦点を固定したままスケールする
+        doubleTapTargetMatrix.value = Matrix4.identity()
+          ..setEntry(0, 0, scale)
+          ..setEntry(1, 1, scale)
+          ..setEntry(0, 3, f.dx * (1 - scale))
+          ..setEntry(1, 3, f.dy * (1 - scale));
+      }
+      doubleTapZoomController.forward(from: 0.0);
+    }
+
+    /// TTS の読み上げ開始・停止を切り替える。
+    /// 読み上げ中に呼ぶと停止、停止中に呼ぶと現在ページのテキストを読み上げる。
+    Future<void> toggleTts() async {
+      if (ttsStatus.value != TtsStatus.idle) {
+        await tts.stop();
+        ttsStatus.value = TtsStatus.idle;
+        ttsHighlightStart.value = null;
+        ttsHighlightEnd.value = null;
+        ttsPageText.value = null;
+        return;
+      }
+
+      final doc = document.value;
+      if (doc == null || pageCount.value == 0) return;
+
+      ttsStatus.value = TtsStatus.loading;
+
+      // context 使用は最初の await より前に行う
+      final langCode = Localizations.localeOf(context).languageCode;
+
+      try {
+        final page = doc.pages[currentPage.value - 1];
+        final pageText = await page.loadText();
+        final nativeText = pageText.fullText.trim();
+        debugPrint('[TTS] loadText length=${nativeText.length}, lang=$langCode');
+
+        String speakText;
+        if (nativeText.isNotEmpty) {
+          // テキスト層あり → ハイライト対応
+          ttsPageText.value = pageText;
+          speakText = nativeText;
+        } else {
+          // テキスト層なし → OCR フォールバック（ハイライトなし）
+          // ビューアーのdocインスタンスと分離するため、ファイルパスを渡して独立ロード
+          final filePath = selectedFile.value?.path;
+          if (filePath == null) {
+            speakText = '';
+          } else {
+            speakText = await _extractTextByOcr(filePath, currentPage.value - 1, langCode);
+          }
+          debugPrint('[TTS] OCR result length=${speakText.length}');
+        }
+
+        if (speakText.isEmpty) {
+          ttsStatus.value = TtsStatus.idle;
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(AppL10n.of(context).ttsNoText)),
+            );
+          }
+          return;
+        }
+
+        await tts.setLanguage(langCode == 'ja' ? 'ja-JP' : 'en-US');
+
+        // 読み上げ中の単語ハイライト（テキスト層がある場合のみ有効）
+        tts.setProgressHandler((text, start, end, word) {
+          if (!context.mounted) return;
+          if (ttsPageText.value != null) {
+            ttsHighlightStart.value = start;
+            ttsHighlightEnd.value = end;
+          }
+        });
+
+        // 読み上げ完了時にステータスとハイライトをリセット
+        tts.setCompletionHandler(() {
+          if (!context.mounted) return;
+          ttsStatus.value = TtsStatus.idle;
+          ttsHighlightStart.value = null;
+          ttsHighlightEnd.value = null;
+          ttsPageText.value = null;
+        });
+
+        ttsStatus.value = TtsStatus.speaking;
+        await tts.speak(speakText);
+      } catch (e, st) {
+        debugPrint('[TTS] error: $e\n$st');
+        ttsStatus.value = TtsStatus.idle;
+        ttsPageText.value = null;
+      }
+    }
+
+    // goToPage によるプログラム遷移中フラグ。
+    // animateToPage が経由ページで onPageChanged を発火させ currentPage を
+    // 上書きするのを防ぐために使用する。
+    final isProgrammaticNav = useRef(false);
+
     /// 指定ページ番号に移動する（PageView アニメーション付き）。
     void goToPage(int page) {
+      isProgrammaticNav.value = true;
       currentPage.value = page;
-      pageController.animateToPage(
-        page - 1,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+      pageController
+          .animateToPage(
+            page - 1,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          )
+          .then((_) => isProgrammaticNav.value = false);
     }
 
     /// 現在ページのブックマーク状態を切り替え、BookmarkController で永続化する。
@@ -406,6 +590,11 @@ class PdfViewerPage extends HookConsumerWidget {
                             pageCount.value = doc.pages.length;
                             document.value = doc;
                             outline.value = await doc.loadOutline();
+                            final ms = DateTime.now()
+                                .difference(viewerOpenedAt)
+                                .inMilliseconds;
+                            debugPrint(
+                                '[PDF Load] ${(ms / 1000).toStringAsFixed(2)}秒');
                           });
                         }
                         // 指の本数を追跡して PageView のスワイプを即座に無効化する。
@@ -452,14 +641,23 @@ class PdfViewerPage extends HookConsumerWidget {
                               : const PageScrollPhysics(),
                           itemCount: doc.pages.length,
                           onPageChanged: (index) {
-                            currentPage.value = index + 1;
+                            // プログラム遷移中は経由ページによる上書きを無視する
+                            if (!isProgrammaticNav.value) {
+                              currentPage.value = index + 1;
+                            }
                             // ページ切り替え時にポインター数をリセット。
                             // 切り替えアニメーション中に pointer cancel が
                             // 届かない場合でも確実に 0 に戻す。
                             pointerCountNotifier.value = 0;
                           },
                           itemBuilder: (context, index) {
-                            return InteractiveViewer(
+                            return GestureDetector(
+                              onDoubleTapDown: (details) {
+                                doubleTapPosition.value =
+                                    details.localPosition;
+                              },
+                              onDoubleTap: handleDoubleTap,
+                              child: InteractiveViewer(
                               transformationController: transformController,
                               minScale: 0.3,
                               maxScale: 5.0,
@@ -543,6 +741,18 @@ class PdfViewerPage extends HookConsumerWidget {
                                                     activeMatch: activeMatch,
                                                   );
                                                 }),
+                                              // TTS 読み上げ中の現在単語ハイライト
+                                              if (ttsHighlightStart.value != null &&
+                                                  ttsHighlightEnd.value != null &&
+                                                  ttsPageText.value != null &&
+                                                  page.pageNumber == currentPage.value)
+                                                PdfTtsHighlightOverlay(
+                                                  page: page,
+                                                  pageSize: size,
+                                                  pageText: ttsPageText.value!,
+                                                  charStart: ttsHighlightStart.value!,
+                                                  charEnd: ttsHighlightEnd.value!,
+                                                ),
                                               // テキスト選択オーバーレイ
                                               // ロングプレスで文字選択、コンテキストメニューからコピー可能
                                               PdfPageTextOverlay(
@@ -579,7 +789,8 @@ class PdfViewerPage extends HookConsumerWidget {
                                   );
                                 },
                               ),
-                            );
+                            ),   // InteractiveViewer
+                            );   // GestureDetector
                           },
                         ),   // PageView.builder
                           ),   // ValueListenableBuilder<int>
@@ -629,6 +840,8 @@ class PdfViewerPage extends HookConsumerWidget {
                     ? () => showMemoDialog(currentPage.value)
                     : null,
                 onBack: () => context.go('/'),
+                ttsStatus: ttsStatus.value,
+                onTtsTap: toggleTts,
               ),
             ),
           ),
@@ -679,5 +892,57 @@ class PdfViewerPage extends HookConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+/// PDF ページを画像レンダリングして ML Kit OCR でテキストを抽出する。
+/// テキスト層を持たない画像型 PDF に対するフォールバック処理。
+/// ビューアーと独立した PdfDocument インスタンスを使うため render() が確実に動作する。
+Future<String> _extractTextByOcr(
+    String filePath, int pageIndex, String langCode) async {
+  // ビューアーのdocとは別インスタンスでPDFを開く（render競合を回避）
+  final doc = await PdfDocument.openFile(filePath);
+  try {
+    final page = doc.pages[pageIndex];
+    // 解像度 2x でレンダリング（OCR 精度向上のため）
+    final w = (page.width * 2).toInt();
+    final h = (page.height * 2).toInt();
+    debugPrint('[OCR] render size=$w x $h');
+    final pdfImage = await page.render(width: w, height: h);
+    debugPrint('[OCR] pdfImage=${pdfImage == null ? "null" : "${pdfImage.width}x${pdfImage.height}"}');
+    if (pdfImage == null) return '';
+    try {
+      final uiImage = await pdfImage.createImage();
+      final byteData =
+          await uiImage.toByteData(format: ui.ImageByteFormat.png);
+      debugPrint('[OCR] byteData=${byteData == null ? "null" : "${byteData.lengthInBytes} bytes"}');
+      if (byteData == null) return '';
+
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/tts_ocr_page.png');
+      await tempFile.writeAsBytes(byteData.buffer.asUint8List());
+
+      final script = langCode == 'ja'
+          ? TextRecognitionScript.japanese
+          : TextRecognitionScript.latin;
+      debugPrint('[OCR] using script=${langCode == 'ja' ? 'japanese' : 'latin'}');
+      final recognizer = TextRecognizer(script: script);
+      try {
+        final result = await recognizer.processImage(
+          InputImage.fromFilePath(tempFile.path),
+        );
+        debugPrint('[OCR] blocks=${result.blocks.length}');
+        // ブロックを上から下の順に並べて結合
+        final blocks = result.blocks
+          ..sort((a, b) => a.boundingBox.top.compareTo(b.boundingBox.top));
+        return blocks.map((b) => b.text).join('\n');
+      } finally {
+        await recognizer.close();
+      }
+    } finally {
+      pdfImage.dispose();
+    }
+  } finally {
+    await doc.dispose();
   }
 }

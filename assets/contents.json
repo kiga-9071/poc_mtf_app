@@ -34,6 +34,13 @@
       "description": "図形・棒グラフ・円グラフ・アイコンカードで構成されたビジュアルPDF。検索・選択は不可（4ページ）。",
       "category": "テスト",
       "url": "http://localhost:8765/image_sample_jp.pdf"
+    },
+    {
+      "id": "99",
+      "title": "大容量テストPDF（200MB）",
+      "description": "バックグラウンドダウンロード検証用。1024x1024px の画像を67ページ埋め込んだ約200MBのファイル。",
+      "category": "テスト",
+      "url": "http://localhost:8765/large_test.pdf"
     }
   ],
   "en": [
@@ -71,6 +78,13 @@
       "description": "A visual PDF composed of shapes, bar charts, pie charts, and icon cards. No text search or selection (4 pages).",
       "category": "Test",
       "url": "http://localhost:8765/image_sample_en.pdf"
+    },
+    {
+      "id": "99",
+      "title": "Large File Test PDF (200MB)",
+      "description": "For background download verification. 67 pages with embedded 1024x1024px images, approx. 200MB total.",
+      "category": "Test",
+      "url": "http://localhost:8765/large_test.pdf"
     }
   ]
 }

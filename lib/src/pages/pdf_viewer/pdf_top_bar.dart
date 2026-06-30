@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n.dart';
+import 'pdf_viewer_constants.dart';
 
 /// PDFビューアー上部のカスタムバー。
 /// 標準の AppBar を使わず独自実装することで PDF 上にオーバーレイ表示できる。
@@ -16,6 +17,8 @@ class PdfTopBar extends StatelessWidget {
     required this.onBookmarkTap,
     required this.onMemoTap,
     required this.onBack,
+    required this.ttsStatus,
+    required this.onTtsTap,
   });
 
   /// AppBar に表示するタイトル（ファイル名）
@@ -44,6 +47,12 @@ class PdfTopBar extends StatelessWidget {
 
   /// 一覧画面に戻るコールバック
   final VoidCallback onBack;
+
+  /// TTS の現在の状態
+  final TtsStatus ttsStatus;
+
+  /// 読み上げボタンのタップコールバック
+  final VoidCallback onTtsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +97,7 @@ class PdfTopBar extends StatelessWidget {
                       color: fgColor),
                 ),
               ),
-              // ページ数・メモ・ブックマークボタン（PDFロード後のみ表示）
+              // ページ数・メモ・ブックマーク・読み上げボタン（PDFロード後のみ表示）
               if (pageCount > 0) ...[
                 Text(
                   '$currentPage / $pageCount',
@@ -114,6 +123,29 @@ class PdfTopBar extends StatelessWidget {
                       ? AppL10n.of(context).removeBookmark
                       : AppL10n.of(context).addBookmark,
                   onPressed: onBookmarkTap,
+                ),
+                // 読み上げボタン
+                IconButton(
+                  icon: switch (ttsStatus) {
+                    TtsStatus.loading => SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: fgColor,
+                        ),
+                      ),
+                    TtsStatus.speaking => const Icon(Icons.stop_circle_outlined,
+                        color: kPdfRedPrimary),
+                    TtsStatus.idle => Icon(Icons.volume_up_outlined,
+                        color: fgColor),
+                  },
+                  tooltip: switch (ttsStatus) {
+                    TtsStatus.loading => AppL10n.of(context).ttsLoading,
+                    TtsStatus.speaking => AppL10n.of(context).ttsStop,
+                    TtsStatus.idle => AppL10n.of(context).ttsRead,
+                  },
+                  onPressed: onTtsTap,
                 ),
               ],
             ],

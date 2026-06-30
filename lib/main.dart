@@ -25,11 +25,13 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: '/viewer',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         // state.extra でコンテンツ一覧から渡されたローカルファイルパスを受け取る
         // 端末からファイルを直接開く場合は null になる
         final filePath = state.extra as String?;
-        return PdfViewerPage(initialFilePath: filePath);
+        return NoTransitionPage(
+          child: PdfViewerPage(initialFilePath: filePath),
+        );
       },
     ),
     GoRoute(
@@ -48,6 +50,17 @@ final _router = GoRouter(
 void main() {
   // Flutter エンジンの初期化（SharedPreferences など非同期処理の前に必要）
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 16ms を超えたフレームをログ出力（ページ送り・ズームなどの応答速度計測用）
+  WidgetsBinding.instance.addTimingsCallback((timings) {
+    for (final t in timings) {
+      final ms = t.totalSpan.inMilliseconds;
+      if (ms > 16) {
+        debugPrint('[Frame] ${ms}ms (build:${t.buildDuration.inMilliseconds}ms raster:${t.rasterDuration.inMilliseconds}ms)');
+      }
+    }
+  });
+
   // ProviderScope: Riverpod の状態管理をアプリ全体に提供するルートウィジェット
   runApp(const ProviderScope(child: MyApp()));
 }
