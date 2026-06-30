@@ -33,7 +33,8 @@ Future<void> resetStorage(BuildContext context) async {
     builder: (ctx) => AlertDialog(
       title: const Text('ストレージを初期化'),
       content: const Text(
-          'ダウンロード済みPDFファイルとブックマークなど、すべてのデータを削除します。\nこの操作は取り消せません。'),
+        'ダウンロード済みPDFファイルとブックマークなど、すべてのデータを削除します。\nこの操作は取り消せません。',
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(false),
@@ -60,9 +61,9 @@ Future<void> resetStorage(BuildContext context) async {
   await prefs.clear();
 
   if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('ストレージを初期化しました')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('ストレージを初期化しました')));
   }
 }
 
@@ -98,12 +99,15 @@ Future<void> showThemeModeDialog(BuildContext context, WidgetRef ref) {
             leading: Icon(icon),
             title: Text(label),
             trailing: isSelected
-                ? Icon(Icons.check_circle,
-                    color: Theme.of(ctx).colorScheme.primary)
+                ? Icon(
+                    Icons.check_circle,
+                    color: Theme.of(ctx).colorScheme.primary,
+                  )
                 : null,
             selected: isSelected,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             onTap: () {
               ref.read(themeModeProvider.notifier).set(mode);
               Navigator.of(ctx).pop();
@@ -139,18 +143,20 @@ Future<void> showLanguageDialog(BuildContext context, WidgetRef ref) {
           final label = locale.languageCode == 'ja'
               ? l10n.languageJa
               : l10n.languageEn;
-          final flag =
-              locale.languageCode == 'ja' ? '🇯🇵' : '🇺🇸';
+          final flag = locale.languageCode == 'ja' ? '🇯🇵' : '🇺🇸';
           return ListTile(
             leading: Text(flag, style: const TextStyle(fontSize: 24)),
             title: Text(label),
             trailing: isSelected
-                ? Icon(Icons.check_circle,
-                    color: Theme.of(ctx).colorScheme.primary)
+                ? Icon(
+                    Icons.check_circle,
+                    color: Theme.of(ctx).colorScheme.primary,
+                  )
                 : null,
             selected: isSelected,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
+              borderRadius: BorderRadius.circular(8),
+            ),
             onTap: () {
               ref.read(localeProvider.notifier).setLocale(locale);
               Navigator.of(ctx).pop();
@@ -169,9 +175,11 @@ Future<void> showLanguageDialog(BuildContext context, WidgetRef ref) {
 class ContentListPage extends HookConsumerWidget {
   const ContentListPage({super.key});
 
-  /// assets/contents.json を読み込み、指定言語コードのコンテンツリストを返す。
+  /// packages/mock_server/assets/contents.json を読み込み、指定言語コードのコンテンツリストを返す。
   Future<List<PdfContent>> _loadContents(String langCode) async {
-    final raw = await rootBundle.loadString('assets/contents.json');
+    final raw = await rootBundle.loadString(
+      'packages/mock_server/assets/contents.json',
+    );
     final json = jsonDecode(raw) as Map<String, dynamic>;
     final list = (json[langCode] ?? json['ja']) as List<dynamic>;
     return list
@@ -190,8 +198,10 @@ class ContentListPage extends HookConsumerWidget {
     final reloadKey = useState(0);
 
     // ロケールが変わるたびにコンテンツを再取得する
-    final contentsFuture =
-        useMemoized(() => _loadContents(locale.languageCode), [locale]);
+    final contentsFuture = useMemoized(
+      () => _loadContents(locale.languageCode),
+      [locale],
+    );
     final snapshot = useFuture(contentsFuture);
 
     // 表示モード（デフォルトはグリッド表示）
@@ -212,9 +222,11 @@ class ContentListPage extends HookConsumerWidget {
           // リスト表示中 → グリッドアイコン（プレビューに切り替え）
           // プレビュー表示中 → リストアイコン（リストに切り替え）
           IconButton(
-            icon: Icon(viewMode.value == _ViewMode.list
-                ? Icons.grid_view
-                : Icons.view_list),
+            icon: Icon(
+              viewMode.value == _ViewMode.list
+                  ? Icons.grid_view
+                  : Icons.view_list,
+            ),
             tooltip: viewMode.value == _ViewMode.list
                 ? l10n.switchToPreview
                 : l10n.switchToList,
@@ -243,40 +255,41 @@ class ContentListPage extends HookConsumerWidget {
           Expanded(
             child: switch (snapshot.connectionState) {
               ConnectionState.waiting => const Center(
-                  child: CircularProgressIndicator(),
-                ),
+                child: CircularProgressIndicator(),
+              ),
               ConnectionState.done when snapshot.hasError => Center(
-                  child: Text(l10n.loadError('${snapshot.error}')),
-                ),
-              _ => viewMode.value == _ViewMode.preview
-                  // プレビューモード: 3列グリッドでPDFサムネイルを表示
-                  ? GridView.builder(
-                      padding: const EdgeInsets.all(8),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,    // 3列
-                        crossAxisSpacing: 8,  // 列間の余白
-                        mainAxisSpacing: 8,   // 行間の余白
-                        mainAxisExtent: 260,  // 各グリッドアイテムの高さ（固定）
+                child: Text(l10n.loadError('${snapshot.error}')),
+              ),
+              _ =>
+                viewMode.value == _ViewMode.preview
+                    // プレビューモード: 3列グリッドでPDFサムネイルを表示
+                    ? GridView.builder(
+                        padding: const EdgeInsets.all(8),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3, // 3列
+                              crossAxisSpacing: 8, // 列間の余白
+                              mainAxisSpacing: 8, // 行間の余白
+                              mainAxisExtent: 260, // 各グリッドアイテムの高さ（固定）
+                            ),
+                        itemCount: snapshot.data!.length,
+                        itemBuilder: (context, index) => ContentPreviewCard(
+                          key: ValueKey('${reloadKey.value}_$index'),
+                          content: snapshot.data![index],
+                          langCode: locale.languageCode,
+                        ),
+                      )
+                    // リストモード: テキスト情報を中心とした縦スクロールリスト
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: snapshot.data!.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) => ContentListCard(
+                          key: ValueKey('${reloadKey.value}_$index'),
+                          content: snapshot.data![index],
+                          langCode: locale.languageCode,
+                        ),
                       ),
-                      itemCount: snapshot.data!.length,
-                      itemBuilder: (context, index) => ContentPreviewCard(
-                        key: ValueKey('${reloadKey.value}_$index'),
-                        content: snapshot.data![index],
-                        langCode: locale.languageCode,
-                      ),
-                    )
-                  // リストモード: テキスト情報を中心とした縦スクロールリスト
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: snapshot.data!.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) => ContentListCard(
-                        key: ValueKey('${reloadKey.value}_$index'),
-                        content: snapshot.data![index],
-                        langCode: locale.languageCode,
-                      ),
-                    ),
             },
           ),
           // ── テスト用: ストレージ初期化ボタン ───────────────────────────────
@@ -285,9 +298,7 @@ class ContentListPage extends HookConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               border: Border(
-                top: BorderSide(
-                  color: Theme.of(context).dividerColor,
-                ),
+                top: BorderSide(color: Theme.of(context).dividerColor),
               ),
             ),
             child: OutlinedButton.icon(

@@ -23,6 +23,8 @@ dependencies:
   go_router: ^14.6.1
   flutter_inappwebview: ^6.1.5
   shared_preferences: ^2.5.5
+  mock_server:
+    path: ./mock_server
 
 dev_dependencies:
   flutter_test:
@@ -34,7 +36,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/
-    - assets/previews/
-    - assets/pdfs/

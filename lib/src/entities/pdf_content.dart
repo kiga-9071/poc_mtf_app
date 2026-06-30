@@ -27,10 +27,23 @@ class PdfContent {
   /// PDFのダウンロードURL
   final String url;
 
-  /// ローカルモード時に参照するアセットパス（URL のファイル名から導出）
+  /// ローカルモード時に参照するアセットパス。
+  ///
+  /// Flutter パッケージアセットの参照形式 `packages/<pkg>/<path>` に従い
+  /// `mock_server` パッケージ内の PDF を指す。ファイル名は [url] の末尾セグメントから導出する。
   String get assetPath {
-    final filename = url.split('/').last;
-    return 'assets/pdfs/$filename';
+    final filename = (() {
+      try {
+        final uri = Uri.parse(url);
+        if (uri.pathSegments.isNotEmpty) {
+          return uri.pathSegments.last;
+        }
+      } catch (_) {
+        // URL パース失敗時は従来ロジックで末尾セグメントを使う。
+      }
+      return url.split('/').last;
+    })();
+    return 'packages/mock_server/assets/pdfs/$filename';
   }
 
   /// プレビュー画像のアセットパス（将来的にはAPIから取得した画像URLに置き換え予定）
@@ -38,14 +51,15 @@ class PdfContent {
 
   /// JSONオブジェクトから PdfContent インスタンスを生成するファクトリコンストラクタ。
   factory PdfContent.fromJson(Map<String, dynamic> json) => PdfContent(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        description: json['description'] as String,
-        category: json['category'] as String,
-        url: json['url'] as String,
-        previewImageAsset: json['previewImage'] as String? ??
-            'assets/previews/${json['id']}.png',
-      );
+    id: json['id'] as String,
+    title: json['title'] as String,
+    description: json['description'] as String,
+    category: json['category'] as String,
+    url: json['url'] as String,
+    previewImageAsset:
+        json['previewImage'] as String? ??
+        'packages/mock_server/assets/previews/${json['id']}.png',
+  );
 }
 
 /// ダウンロード済みPDFのローカル保存パスを生成する。
