@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:dio/dio.dart';
+import 'package:background_downloader/background_downloader.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -44,7 +44,7 @@ class ContentPreviewCard extends HookConsumerWidget {
     // ダウンロード進捗（0.0 〜 1.0）
     final progress = useState(0.0);
     // ダウンロードごとに新しいトークンを生成するため useState で保持する
-    final cancelToken = useState(CancelToken());
+    final currentTaskId = useState<String?>(null);
     final isDownloaded = useState(false);
     // 保存済みファイルのローカルパス（サムネイル表示に使用）
     final savedPath = useState<String?>(null);
@@ -72,7 +72,6 @@ class ContentPreviewCard extends HookConsumerWidget {
     Future<void> download() async {
       if (dirSnapshot.data == null) return;
       final path = buildSavePath(dirSnapshot.data!, content, langCode);
-      cancelToken.value = CancelToken();
       isDownloading.value = true;
       progress.value = 0;
 
@@ -98,41 +97,49 @@ class ContentPreviewCard extends HookConsumerWidget {
         return;
       }
 
-      // サーバーモード: Dio でダウンロード
-      final token = cancelToken.value;
+      // サーバーモード: background_downloader でバックグラウンドダウンロード
+      final taskId = '${content.id}_$langCode';
+      currentTaskId.value = taskId;
       try {
-        final dio = Dio();
-        await dio.download(
-          content.url,
-          path,
-          cancelToken: token,
-          onReceiveProgress: (received, total) {
+        final result = await FileDownloader().download(
+          DownloadTask(
+            taskId: taskId,
+            url: Uri.encodeFull(content.url),
+            filename: path.split('/').last,
+            directory: '',
+            baseDirectory: BaseDirectory.applicationDocuments,
+            updates: Updates.statusAndProgress,
+          ),
+          onProgress: (prog) {
             if (!context.mounted) return;
-            if (total > 0) progress.value = received / total;
+            progress.value = prog;
           },
         );
-        if (context.mounted) {
-          isDownloading.value = false;
-          if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
-          context.go('/viewer', extra: path);
-        }
-      } on DioException catch (e) {
-        if (e.type == DioExceptionType.cancel) return;
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.downloadFailed(e.message ?? ''))),
-          );
-          isDownloading.value = false;
-          progress.value = 0;
+        if (!context.mounted) return;
+        currentTaskId.value = null;
+        switch (result.status) {
+          case TaskStatus.complete:
+            isDownloading.value = false;
+            if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
+            context.go('/viewer', extra: path);
+          case TaskStatus.canceled:
+            isDownloading.value = false;
+            progress.value = 0;
+          default:
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.downloadFailed(result.exception?.description ?? ''))),
+            );
+            isDownloading.value = false;
+            progress.value = 0;
         }
       } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.errorMsg('$e'))),
-          );
-          isDownloading.value = false;
-          progress.value = 0;
-        }
+        if (!context.mounted) return;
+        currentTaskId.value = null;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorMsg('$e'))),
+        );
+        isDownloading.value = false;
+        progress.value = 0;
       }
     }
 
@@ -243,16 +250,21 @@ class ContentPreviewCard extends HookConsumerWidget {
                   // カテゴリーバッジ・保存済みアイコン・削除ボタン
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color:
-                              Theme.of(context).colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(4),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color:
+                                Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            content.category,
+                            style: const TextStyle(fontSize: 10),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        child: Text(content.category,
-                            style: const TextStyle(fontSize: 10)),
                       ),
                       if (downloaded) ...[
                         const SizedBox(width: 4),
@@ -302,7 +314,11 @@ class ContentPreviewCard extends HookConsumerWidget {
                                   ),
                                   const SizedBox(width: 6),
                                   GestureDetector(
-                                    onTap: () => cancelToken.value.cancel(),
+                                    onTap: () {
+                                      if (currentTaskId.value != null) {
+                                        FileDownloader().cancelTaskWithId(currentTaskId.value!);
+                                      }
+                                    },
                                     child: Icon(Icons.cancel,
                                         size: 20,
                                         color: Theme.of(context)

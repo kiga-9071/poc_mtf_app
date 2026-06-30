@@ -190,6 +190,18 @@ class AppL10n {
 
   // ── テーマ設定 ────────────────────────────────────────────────────────────
 
+  /// 読み上げ開始ボタンのツールチップ
+  String get ttsRead => _ja ? '読み上げ' : 'Read Aloud';
+
+  /// 読み上げ停止ボタンのツールチップ
+  String get ttsStop => _ja ? '読み上げを停止' : 'Stop Reading';
+
+  /// 読み上げ準備中のツールチップ
+  String get ttsLoading => _ja ? '読み上げ準備中...' : 'Preparing...';
+
+  /// このページにテキストがない場合のメッセージ
+  String get ttsNoText => _ja ? 'このページにテキストがありません' : 'No text on this page';
+
   /// テーマ設定ダイアログのタイトル
   String get themeLabel => _ja ? 'テーマ' : 'Theme';
 

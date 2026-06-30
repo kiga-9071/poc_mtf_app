@@ -12,6 +12,9 @@ const kPdfThumbnailWidth = 70.0;
 /// AppBarとサムネイルバーのスライドアニメーション時間
 const kPdfBarDuration = Duration(milliseconds: 250);
 
+/// TTS（読み上げ）の状態
+enum TtsStatus { idle, loading, speaking }
+
 /// ダークモード時にPDFページ画像の色を反転させるカラーフィルター。
 /// 白背景→黒背景・黒文字→白文字 に変換する 4×5 の RGBA カラーマトリクス。
 /// アルファ値は変更しないため半透明コンテンツはそのまま維持される。

@@ -25,6 +25,9 @@ dependencies:
   shared_preferences: ^2.5.5
   mock_server:
     path: ./mock_server
+  flutter_tts: ^4.2.0
+  google_mlkit_text_recognition: ^0.13.0
+  background_downloader: ^9.0.0
 
 dev_dependencies:
   flutter_test:

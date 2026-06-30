@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:dio/dio.dart';
+import 'package:background_downloader/background_downloader.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -36,7 +36,7 @@ class ContentListCard extends HookConsumerWidget {
     final progress = useState(0.0);
     // ダウンロードごとに新しいトークンを生成するため ValueNotifier で保持する。
     // useMemoized では一度キャンセルしたトークンが使い回されてサイレント失敗するため使わない。
-    final cancelToken = useState(CancelToken());
+    final currentTaskId = useState<String?>(null);
     final isDownloaded = useState(false);
     final savedPath = useState<String?>(null);
     final fileSize = useState<int?>(null);
@@ -66,7 +66,6 @@ class ContentListCard extends HookConsumerWidget {
     Future<void> download() async {
       if (dirSnapshot.data == null) return;
       final path = buildSavePath(dirSnapshot.data!, content, langCode);
-      cancelToken.value = CancelToken();
       isDownloading.value = true;
       progress.value = 0;
 
@@ -92,41 +91,49 @@ class ContentListCard extends HookConsumerWidget {
         return;
       }
 
-      // サーバーモード: Dio でダウンロード
-      final token = cancelToken.value;
+      // サーバーモード: background_downloader でバックグラウンドダウンロード
+      final taskId = '${content.id}_$langCode';
+      currentTaskId.value = taskId;
       try {
-        final dio = Dio();
-        await dio.download(
-          content.url,
-          path,
-          cancelToken: token,
-          onReceiveProgress: (received, total) {
+        final result = await FileDownloader().download(
+          DownloadTask(
+            taskId: taskId,
+            url: Uri.encodeFull(content.url),
+            filename: path.split('/').last,
+            directory: '',
+            baseDirectory: BaseDirectory.applicationDocuments,
+            updates: Updates.statusAndProgress,
+          ),
+          onProgress: (prog) {
             if (!context.mounted) return;
-            if (total > 0) progress.value = received / total;
+            progress.value = prog;
           },
         );
-        if (context.mounted) {
-          isDownloading.value = false;
-          if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
-          context.go('/viewer', extra: path);
-        }
-      } on DioException catch (e) {
-        if (e.type == DioExceptionType.cancel) return;
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.downloadFailed(e.message ?? ''))),
-          );
-          isDownloading.value = false;
-          progress.value = 0;
+        if (!context.mounted) return;
+        currentTaskId.value = null;
+        switch (result.status) {
+          case TaskStatus.complete:
+            isDownloading.value = false;
+            if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
+            context.go('/viewer', extra: path);
+          case TaskStatus.canceled:
+            isDownloading.value = false;
+            progress.value = 0;
+          default:
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.downloadFailed(result.exception?.description ?? ''))),
+            );
+            isDownloading.value = false;
+            progress.value = 0;
         }
       } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.errorMsg('$e'))),
-          );
-          isDownloading.value = false;
-          progress.value = 0;
-        }
+        if (!context.mounted) return;
+        currentTaskId.value = null;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorMsg('$e'))),
+        );
+        isDownloading.value = false;
+        progress.value = 0;
       }
     }
 
@@ -251,7 +258,11 @@ class ContentListCard extends HookConsumerWidget {
                     style: const TextStyle(fontSize: 12),
                   ),
                   TextButton(
-                    onPressed: () => cancelToken.value.cancel(),
+                    onPressed: () {
+                      if (currentTaskId.value != null) {
+                        FileDownloader().cancelTaskWithId(currentTaskId.value!);
+                      }
+                    },
                     child: Text(l10n.cancel,
                         style: const TextStyle(fontSize: 12)),
                   ),
