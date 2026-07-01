@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../controllers/content_master_controller.dart';
 import '../../controllers/locale_controller.dart';
-import '../../controllers/source_mode_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../l10n.dart';
 import 'content_list_card.dart';
@@ -31,7 +30,8 @@ Future<void> resetStorage(BuildContext context) async {
     builder: (ctx) => AlertDialog(
       title: const Text('ストレージを初期化'),
       content: const Text(
-          'ダウンロード済みPDFファイルとブックマークなど、すべてのデータを削除します。\nこの操作は取り消せません。'),
+        'ダウンロード済みPDFファイルとブックマークなど、すべてのデータを削除します。\nこの操作は取り消せません。',
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(false),
@@ -58,9 +58,9 @@ Future<void> resetStorage(BuildContext context) async {
   await prefs.clear();
 
   if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('ストレージを初期化しました')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('ストレージを初期化しました')));
   }
 }
 
@@ -96,12 +96,15 @@ Future<void> showThemeModeDialog(BuildContext context, WidgetRef ref) {
             leading: Icon(icon),
             title: Text(label),
             trailing: isSelected
-                ? Icon(Icons.check_circle,
-                    color: Theme.of(ctx).colorScheme.primary)
+                ? Icon(
+                    Icons.check_circle,
+                    color: Theme.of(ctx).colorScheme.primary,
+                  )
                 : null,
             selected: isSelected,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             onTap: () {
               ref.read(themeModeProvider.notifier).set(mode);
               Navigator.of(ctx).pop();
@@ -137,18 +140,20 @@ Future<void> showLanguageDialog(BuildContext context, WidgetRef ref) {
           final label = locale.languageCode == 'ja'
               ? l10n.languageJa
               : l10n.languageEn;
-          final flag =
-              locale.languageCode == 'ja' ? '🇯🇵' : '🇺🇸';
+          final flag = locale.languageCode == 'ja' ? '🇯🇵' : '🇺🇸';
           return ListTile(
             leading: Text(flag, style: const TextStyle(fontSize: 24)),
             title: Text(label),
             trailing: isSelected
-                ? Icon(Icons.check_circle,
-                    color: Theme.of(ctx).colorScheme.primary)
+                ? Icon(
+                    Icons.check_circle,
+                    color: Theme.of(ctx).colorScheme.primary,
+                  )
                 : null,
             selected: isSelected,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
+              borderRadius: BorderRadius.circular(8),
+            ),
             onTap: () {
               ref.read(localeProvider.notifier).setLocale(locale);
               Navigator.of(ctx).pop();
@@ -171,7 +176,6 @@ class ContentListPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final locale = ref.watch(localeProvider);
     final themeMode = ref.watch(themeModeProvider);
-    final sourceMode = ref.watch(sourceModeProvider);
     final l10n = AppL10n.of(context);
 
     // サーバーから取得したコンテンツマスター（表示期間・信頼できる時刻を含む）
@@ -205,9 +209,11 @@ class ContentListPage extends HookConsumerWidget {
         actions: [
           // 表示モード切替ボタン
           IconButton(
-            icon: Icon(viewMode.value == _ViewMode.list
-                ? Icons.grid_view
-                : Icons.view_list),
+            icon: Icon(
+              viewMode.value == _ViewMode.list
+                  ? Icons.grid_view
+                  : Icons.view_list,
+            ),
             tooltip: viewMode.value == _ViewMode.list
                 ? l10n.switchToPreview
                 : l10n.switchToList,
@@ -278,12 +284,10 @@ class ContentListPage extends HookConsumerWidget {
           // ── テスト用: ストレージ初期化ボタン ───────────────────────────────
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
               border: Border(
-                top: BorderSide(
-                  color: Theme.of(context).dividerColor,
-                ),
+                top: BorderSide(color: Theme.of(context).dividerColor),
               ),
             ),
             child: OutlinedButton.icon(
@@ -302,50 +306,6 @@ class ContentListPage extends HookConsumerWidget {
                   ref.read(contentMasterProvider.notifier).refresh();
                 }
               },
-            ),
-          ),
-          // ── ソースモード切替 ────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Row(
-              children: [
-                Icon(
-                  sourceMode == SourceMode.server
-                      ? Icons.cloud_download_outlined
-                      : Icons.phone_android,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${l10n.sourceMode}: ',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const Spacer(),
-                SegmentedButton<SourceMode>(
-                  segments: [
-                    ButtonSegment(
-                      value: SourceMode.server,
-                      label: Text(l10n.sourceModeServer),
-                      icon: const Icon(Icons.cloud_download_outlined, size: 14),
-                    ),
-                    ButtonSegment(
-                      value: SourceMode.local,
-                      label: Text(l10n.sourceModeLocal),
-                      icon: const Icon(Icons.phone_android, size: 14),
-                    ),
-                  ],
-                  selected: {sourceMode},
-                  style: const ButtonStyle(
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  onSelectionChanged: (modes) =>
-                      ref.read(sourceModeProvider.notifier).set(modes.first),
-                ),
-              ],
             ),
           ),
         ],

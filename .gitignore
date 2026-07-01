@@ -53,9 +53,6 @@ ios/.symlinks/
 # FVM Version Cache
 .fvm/
 
-# Local PDF server
-pdf_server/
-
 # Python
 __pycache__/
 *.pyc
