@@ -40,15 +40,6 @@ class AppL10n {
   /// 削除ボタンのラベル
   String get delete => _ja ? '削除' : 'Delete';
 
-  /// PDF取得元モードのラベル
-  String get sourceMode => _ja ? 'PDFソース' : 'PDF Source';
-
-  /// サーバーからダウンロードするモードのラベル
-  String get sourceModeServer => _ja ? 'サーバー' : 'Server';
-
-  /// アプリ内蔵PDFを使うモードのラベル
-  String get sourceModeLocal => _ja ? '内蔵PDF' : 'Built-in';
-
   /// 開くボタンのラベル
   String get open => _ja ? '開く' : 'Open';
 

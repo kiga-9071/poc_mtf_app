@@ -49,25 +49,6 @@ class PdfContent {
   /// スクリーンショット・録画を OS レベルで抑止するかどうか
   final bool preventCapture;
 
-  /// ローカルモード時に参照するアセットパス。
-  ///
-  /// Flutter パッケージアセットの参照形式 `packages/<pkg>/<path>` に従い
-  /// `mock_server` パッケージ内の PDF を指す。ファイル名は [url] の末尾セグメントから導出する。
-  String get assetPath {
-    final filename = (() {
-      try {
-        final uri = Uri.parse(url);
-        if (uri.pathSegments.isNotEmpty) {
-          return uri.pathSegments.last;
-        }
-      } catch (_) {
-        // URL パース失敗時は従来ロジックで末尾セグメントを使う。
-      }
-      return url.split('/').last;
-    })();
-    return 'packages/mock_server/assets/pdfs/$filename';
-  }
-
   /// プレビュー画像のアセットパス（将来的にはAPIから取得した画像URLに置き換え予定）
   final String previewImageAsset;
 

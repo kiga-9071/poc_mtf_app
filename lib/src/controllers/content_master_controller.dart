@@ -3,12 +3,10 @@ import 'dart:io' show HttpDate;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../entities/pdf_content.dart';
-import 'source_mode_controller.dart';
 
 const _kContentsServerUrl = 'http://localhost:8765/contents.json';
 const _kCacheJsonKey = 'content_master_json';
@@ -44,17 +42,14 @@ class ContentMaster {
 
 final contentMasterProvider =
     StateNotifierProvider<ContentMasterNotifier, AsyncValue<ContentMaster>>(
-  (ref) => ContentMasterNotifier(ref),
+  (ref) => ContentMasterNotifier(),
 );
 
 class ContentMasterNotifier extends StateNotifier<AsyncValue<ContentMaster>> {
-  ContentMasterNotifier(this._ref) : super(const AsyncValue.loading()) {
-    // ソースモードが切り替わったら最新データを再取得する
-    _ref.listen<SourceMode>(sourceModeProvider, (_, next) => _fetchAndUpdate(next));
+  ContentMasterNotifier() : super(const AsyncValue.loading()) {
     _init();
   }
 
-  final Ref _ref;
   final _dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 5)));
 
   Future<void> _init() async {
@@ -63,33 +58,16 @@ class ContentMasterNotifier extends StateNotifier<AsyncValue<ContentMaster>> {
     if (cached != null && state is AsyncLoading) {
       state = AsyncValue.data(cached);
     }
-    await _fetchAndUpdate(_ref.read(sourceModeProvider));
+    await _fetchAndUpdate();
   }
 
   /// アプリ起動・復帰時に呼び出してマスターデータを最新化する。
   Future<void> refresh() async {
-    await _fetchAndUpdate(_ref.read(sourceModeProvider));
+    await _fetchAndUpdate();
   }
 
-  Future<void> _fetchAndUpdate(SourceMode sourceMode) async {
-    if (sourceMode == SourceMode.local) {
-      await _loadFromAsset();
-    } else {
-      await _loadFromServer();
-    }
-  }
-
-  Future<void> _loadFromAsset() async {
-    try {
-      final raw = await rootBundle.loadString('assets/contents.json');
-      final now = DateTime.now();
-      final master = _parse(raw, trustedTime: null, lastFetchedAt: now);
-      state = AsyncValue.data(master);
-      await _saveToCache(raw, trustedTimeMs: null, fetchedAtMs: now.millisecondsSinceEpoch);
-    } catch (e, st) {
-      debugPrint('[ContentMaster] asset load error: $e');
-      if (state is AsyncLoading) state = AsyncValue.error(e, st);
-    }
+  Future<void> _fetchAndUpdate() async {
+    await _loadFromServer();
   }
 
   Future<void> _loadFromServer() async {
@@ -118,12 +96,9 @@ class ContentMasterNotifier extends StateNotifier<AsyncValue<ContentMaster>> {
         trustedTimeMs: trustedTime.millisecondsSinceEpoch,
         fetchedAtMs: now.millisecondsSinceEpoch,
       );
-    } catch (e) {
+    } catch (e, st) {
       debugPrint('[ContentMaster] server fetch error: $e');
-      // 初回ロードでサーバー取得失敗した場合のみアセットにフォールバック
-      if (state is AsyncLoading) {
-        await _loadFromAsset();
-      }
+      if (state is AsyncLoading) state = AsyncValue.error(e, st);
       // キャッシュが既にある場合はサイレント失敗（既存データを維持）
     }
   }

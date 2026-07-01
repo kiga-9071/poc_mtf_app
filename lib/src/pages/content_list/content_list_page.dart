@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../controllers/content_master_controller.dart';
 import '../../controllers/locale_controller.dart';
-import '../../controllers/source_mode_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../l10n.dart';
 import 'content_list_card.dart';
@@ -177,7 +176,6 @@ class ContentListPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final locale = ref.watch(localeProvider);
     final themeMode = ref.watch(themeModeProvider);
-    final sourceMode = ref.watch(sourceModeProvider);
     final l10n = AppL10n.of(context);
 
     // サーバーから取得したコンテンツマスター（表示期間・信頼できる時刻を含む）
@@ -308,50 +306,6 @@ class ContentListPage extends HookConsumerWidget {
                   ref.read(contentMasterProvider.notifier).refresh();
                 }
               },
-            ),
-          ),
-          // ── ソースモード切替 ────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Row(
-              children: [
-                Icon(
-                  sourceMode == SourceMode.server
-                      ? Icons.cloud_download_outlined
-                      : Icons.phone_android,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${l10n.sourceMode}: ',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const Spacer(),
-                SegmentedButton<SourceMode>(
-                  segments: [
-                    ButtonSegment(
-                      value: SourceMode.server,
-                      label: Text(l10n.sourceModeServer),
-                      icon: const Icon(Icons.cloud_download_outlined, size: 14),
-                    ),
-                    ButtonSegment(
-                      value: SourceMode.local,
-                      label: Text(l10n.sourceModeLocal),
-                      icon: const Icon(Icons.phone_android, size: 14),
-                    ),
-                  ],
-                  selected: {sourceMode},
-                  style: const ButtonStyle(
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  onSelectionChanged: (modes) =>
-                      ref.read(sourceModeProvider.notifier).set(modes.first),
-                ),
-              ],
             ),
           ),
         ],
