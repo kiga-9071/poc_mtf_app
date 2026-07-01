@@ -97,11 +97,20 @@ Future<void> _startPdfServer() async {
     }
 
     final cache = <String, Uint8List>{};
+
+    // contents.json として配信する
+    cache['contents.json'] = Uint8List.fromList(utf8.encode(raw));
+
     for (final filename in filenames) {
-      final asset = await rootBundle.load(
-        'packages/mock_server/assets/pdfs/$filename',
-      );
-      cache[filename] = asset.buffer.asUint8List();
+      try {
+        final asset = await rootBundle.load(
+          'packages/mock_server/assets/pdfs/$filename',
+        );
+        cache[filename] = asset.buffer.asUint8List();
+      } catch (_) {
+        // アセットに存在しないファイルはスキップする。
+        debugPrint('PDF server: skipping missing asset "$filename"');
+      }
     }
 
     await _pdfServer.start(cache);

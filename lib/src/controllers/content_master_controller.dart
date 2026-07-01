@@ -8,7 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../entities/pdf_content.dart';
 
-const _kContentsServerUrl = 'http://localhost:8765/contents.json';
+// iOS では localhost が ::1 (IPv6) に解決されてコネクション拒否になるため
+// サーバーのバインドアドレス 127.0.0.1 (IPv4) を直接指定する。
+const _kContentsServerUrl = 'http://127.0.0.1:8765/contents.json';
 const _kCacheJsonKey = 'content_master_json';
 const _kFetchedAtKey = 'content_master_fetched_at_ms';
 const _kTrustedTimeKey = 'content_master_trusted_time_ms';
