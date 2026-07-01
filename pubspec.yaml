@@ -34,6 +34,7 @@ dependencies:
   # ネットワーク・ダウンロード
   dio: ^5.7.0
   background_downloader: ^9.0.0
+  screen_protector: ^1.5.2
 
   # WebView
   flutter_inappwebview: ^6.1.5
