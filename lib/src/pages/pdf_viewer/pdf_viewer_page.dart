@@ -11,6 +11,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
+import '../../services/capture_protection_service.dart';
 
 import '../../controllers/bookmark_controller.dart';
 import '../../controllers/memo_controller.dart';
@@ -36,10 +37,18 @@ import '../../webview/webview_page.dart';
 /// - 下部: PdfThumbnailStrip（ページ一覧・タップでジャンプ）
 /// - キーワード検索: PdfSearchNavBar + PdfSearchHighlightOverlay
 class PdfViewerPage extends HookConsumerWidget {
-  const PdfViewerPage({super.key, this.initialFilePath});
+  const PdfViewerPage({
+    super.key,
+    this.initialFilePath,
+    this.preventCapture = false,
+  });
 
   /// コンテンツ一覧から遷移してきた場合のローカルファイルパス
   final String? initialFilePath;
+
+  /// true のとき OS レベルでスクリーンショット・録画を抑止する。
+  /// Android: FLAG_SECURE / iOS: セキュアテキスト入力トリック + バックグラウンド時オーバーレイ
+  final bool preventCapture;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -188,6 +197,19 @@ class PdfViewerPage extends HookConsumerWidget {
       }
       return null;
     }, []);
+
+    // preventCapture が true のとき OS レベルでキャプチャを抑止する。
+    // Android: MainActivity の MethodChannel 経由で FLAG_SECURE を直接設定する。
+    // iOS: screen_protector の UITextField トリック + バックグラウンド時の黒オーバーレイ。
+    useEffect(() {
+      if (!preventCapture) return null;
+      debugPrint('[PdfViewer] captureProtection: enable');
+      CaptureProtectionService.enable();
+      return () {
+        debugPrint('[PdfViewer] captureProtection: disable');
+        CaptureProtectionService.disable();
+      };
+    }, const []);
 
     // ファイルが変わったらブックマーク・メモをストレージから読み込む
     useEffect(() {

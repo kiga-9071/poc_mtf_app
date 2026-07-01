@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../controllers/source_mode_controller.dart';
 import '../../entities/pdf_content.dart';
+import '../../entities/viewer_args.dart';
 import '../../l10n.dart';
 
 /// PDFの1ページ目サムネイルを大きく表示するグリッド用カードウィジェット。
@@ -25,6 +26,7 @@ class ContentPreviewCard extends HookConsumerWidget {
     super.key,
     required this.content,
     required this.langCode,
+    required this.isAvailable,
   });
 
   /// 表示するコンテンツの情報
@@ -32,6 +34,9 @@ class ContentPreviewCard extends HookConsumerWidget {
 
   /// 現在の表示言語コード（ファイル保存パスの生成に使用）
   final String langCode;
+
+  /// 表示期間内かどうか（false の場合はダウンロード・閲覧を無効化）
+  final bool isAvailable;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -83,7 +88,7 @@ class ContentPreviewCard extends HookConsumerWidget {
           if (context.mounted) {
             isDownloading.value = false;
             if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
-            context.go('/viewer', extra: path);
+            context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
           }
         } catch (e) {
           if (context.mounted) {
@@ -121,7 +126,7 @@ class ContentPreviewCard extends HookConsumerWidget {
           case TaskStatus.complete:
             isDownloading.value = false;
             if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
-            context.go('/viewer', extra: path);
+            context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
           case TaskStatus.canceled:
             isDownloading.value = false;
             progress.value = 0;
@@ -248,30 +253,62 @@ class ContentPreviewCard extends HookConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // カテゴリーバッジ・保存済みアイコン・削除ボタン
+                  // Expanded で左グループを確保し、削除ボタンは右端に固定する。
+                  // Spacer と Flexible を同列に置くと固定要素が増えたときに
+                  // カテゴリーバッジ幅がパディング以下に圧縮される問題を防ぐ。
                   Row(
                     children: [
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            content.category,
-                            style: const TextStyle(fontSize: 10),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                      Expanded(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primaryContainer,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  content.category,
+                                  style: const TextStyle(fontSize: 10),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            if (!isAvailable) ...[
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border:
+                                      Border.all(color: Colors.red.shade300),
+                                ),
+                                child: Text(
+                                  content.availableTo != null &&
+                                          DateTime.now()
+                                              .isAfter(content.availableTo!)
+                                      ? l10n.contentExpired
+                                      : l10n.contentNotYet,
+                                  style: TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.red.shade700),
+                                ),
+                              ),
+                            ] else if (downloaded) ...[
+                              const SizedBox(width: 4),
+                              Icon(Icons.check_circle,
+                                  size: 14, color: Colors.green.shade600),
+                            ],
+                          ],
                         ),
                       ),
-                      if (downloaded) ...[
-                        const SizedBox(width: 4),
-                        Icon(Icons.check_circle,
-                            size: 14, color: Colors.green.shade600),
-                      ],
-                      const Spacer(),
                       if (downloaded)
                         GestureDetector(
                           onTap: deleteFile,
@@ -336,17 +373,24 @@ class ContentPreviewCard extends HookConsumerWidget {
                                       MaterialTapTargetSize.shrinkWrap,
                                   textStyle: const TextStyle(fontSize: 11),
                                 ),
-                                onPressed: downloaded
-                                    ? (path != null
-                                        ? () =>
-                                            context.go('/viewer', extra: path)
-                                        : null)
-                                    : (dirSnapshot.hasData ? download : null),
+                                onPressed: !isAvailable
+                                    ? null
+                                    : downloaded
+                                        ? (path != null
+                                            ? () => context.go('/viewer',
+                                                extra: ViewerArgs(
+                                                    filePath: path,
+                                                    preventCapture: content
+                                                        .preventCapture))
+                                            : null)
+                                        : (dirSnapshot.hasData ? download : null),
                                 child: FittedBox(
                                   fit: BoxFit.scaleDown,
-                                  child: Text(downloaded
-                                      ? l10n.open
-                                      : l10n.downloadAndSave),
+                                  child: Text(!isAvailable
+                                      ? l10n.contentUnavailableButton
+                                      : downloaded
+                                          ? l10n.open
+                                          : l10n.downloadAndSave),
                                 ),
                               ),
                       ),

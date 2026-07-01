@@ -1,17 +1,15 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../controllers/content_master_controller.dart';
 import '../../controllers/locale_controller.dart';
 import '../../controllers/source_mode_controller.dart';
 import '../../controllers/theme_controller.dart';
-import '../../entities/pdf_content.dart';
 import '../../l10n.dart';
 import 'content_list_card.dart';
 import 'content_preview_card.dart';
@@ -169,16 +167,6 @@ Future<void> showLanguageDialog(BuildContext context, WidgetRef ref) {
 class ContentListPage extends HookConsumerWidget {
   const ContentListPage({super.key});
 
-  /// assets/contents.json を読み込み、指定言語コードのコンテンツリストを返す。
-  Future<List<PdfContent>> _loadContents(String langCode) async {
-    final raw = await rootBundle.loadString('assets/contents.json');
-    final json = jsonDecode(raw) as Map<String, dynamic>;
-    final list = (json[langCode] ?? json['ja']) as List<dynamic>;
-    return list
-        .map((e) => PdfContent.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final locale = ref.watch(localeProvider);
@@ -186,16 +174,23 @@ class ContentListPage extends HookConsumerWidget {
     final sourceMode = ref.watch(sourceModeProvider);
     final l10n = AppL10n.of(context);
 
+    // サーバーから取得したコンテンツマスター（表示期間・信頼できる時刻を含む）
+    final masterAsync = ref.watch(contentMasterProvider);
+
     // ストレージ初期化後にカード状態を強制リセットするためのキー
     final reloadKey = useState(0);
 
-    // ロケールが変わるたびにコンテンツを再取得する
-    final contentsFuture =
-        useMemoized(() => _loadContents(locale.languageCode), [locale]);
-    final snapshot = useFuture(contentsFuture);
-
     // 表示モード（デフォルトはグリッド表示）
     final viewMode = useState(_ViewMode.preview);
+
+    // アプリ復帰時に最新マスターデータを再取得する
+    final lifecycle = useAppLifecycleState();
+    useEffect(() {
+      if (lifecycle == AppLifecycleState.resumed) {
+        ref.read(contentMasterProvider.notifier).refresh();
+      }
+      return null;
+    }, [lifecycle]);
 
     // テーマモードアイコン（現在のモードを反映）
     final themeIcon = switch (themeMode) {
@@ -209,8 +204,6 @@ class ContentListPage extends HookConsumerWidget {
         title: Text(l10n.contentList),
         actions: [
           // 表示モード切替ボタン
-          // リスト表示中 → グリッドアイコン（プレビューに切り替え）
-          // プレビュー表示中 → リストアイコン（リストに切り替え）
           IconButton(
             icon: Icon(viewMode.value == _ViewMode.list
                 ? Icons.grid_view
@@ -241,43 +234,46 @@ class ContentListPage extends HookConsumerWidget {
       body: Column(
         children: [
           Expanded(
-            child: switch (snapshot.connectionState) {
-              ConnectionState.waiting => const Center(
-                  child: CircularProgressIndicator(),
-                ),
-              ConnectionState.done when snapshot.hasError => Center(
-                  child: Text(l10n.loadError('${snapshot.error}')),
-                ),
-              _ => viewMode.value == _ViewMode.preview
-                  // プレビューモード: 3列グリッドでPDFサムネイルを表示
-                  ? GridView.builder(
-                      padding: const EdgeInsets.all(8),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,    // 3列
-                        crossAxisSpacing: 8,  // 列間の余白
-                        mainAxisSpacing: 8,   // 行間の余白
-                        mainAxisExtent: 260,  // 各グリッドアイテムの高さ（固定）
-                      ),
-                      itemCount: snapshot.data!.length,
-                      itemBuilder: (context, index) => ContentPreviewCard(
-                        key: ValueKey('${reloadKey.value}_$index'),
-                        content: snapshot.data![index],
-                        langCode: locale.languageCode,
-                      ),
-                    )
-                  // リストモード: テキスト情報を中心とした縦スクロールリスト
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: snapshot.data!.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) => ContentListCard(
-                        key: ValueKey('${reloadKey.value}_$index'),
-                        content: snapshot.data![index],
-                        langCode: locale.languageCode,
-                      ),
-                    ),
-            },
+            child: masterAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) =>
+                  Center(child: Text(l10n.loadError('$err'))),
+              data: (master) {
+                final contents = master.contentsFor(locale.languageCode);
+                final now = master.now;
+                return viewMode.value == _ViewMode.preview
+                    // プレビューモード: 3列グリッドでPDFサムネイルを表示
+                    ? GridView.builder(
+                        padding: const EdgeInsets.all(8),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                          mainAxisExtent: 260,
+                        ),
+                        itemCount: contents.length,
+                        itemBuilder: (context, index) => ContentPreviewCard(
+                          key: ValueKey('${reloadKey.value}_$index'),
+                          content: contents[index],
+                          langCode: locale.languageCode,
+                          isAvailable: contents[index].isAvailableAt(now),
+                        ),
+                      )
+                    // リストモード: テキスト情報を中心とした縦スクロールリスト
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: contents.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) => ContentListCard(
+                          key: ValueKey('${reloadKey.value}_$index'),
+                          content: contents[index],
+                          langCode: locale.languageCode,
+                          isAvailable: contents[index].isAvailableAt(now),
+                        ),
+                      );
+              },
+            ),
           ),
           // ── テスト用: ストレージ初期化ボタン ───────────────────────────────
           Container(
@@ -301,7 +297,10 @@ class ContentListPage extends HookConsumerWidget {
               ),
               onPressed: () async {
                 await resetStorage(context);
-                if (context.mounted) reloadKey.value++;
+                if (context.mounted) {
+                  reloadKey.value++;
+                  ref.read(contentMasterProvider.notifier).refresh();
+                }
               },
             ),
           ),

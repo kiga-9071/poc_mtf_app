@@ -2,6 +2,16 @@ import 'dart:io';
 
 /// コンテンツ一覧に表示するPDFコンテンツのデータモデル。
 /// contents.json の各エントリーに対応する。
+/// 表示期間の状態。
+enum AvailabilityStatus {
+  /// 現在公開中
+  available,
+  /// 公開開始前
+  notYet,
+  /// 公開終了
+  expired,
+}
+
 class PdfContent {
   const PdfContent({
     required this.id,
@@ -10,6 +20,9 @@ class PdfContent {
     required this.category,
     required this.url,
     required this.previewImageAsset,
+    this.availableFrom,
+    this.availableTo,
+    this.preventCapture = false,
   });
 
   /// コンテンツの一意な識別子（ファイル名生成に使用）
@@ -27,6 +40,15 @@ class PdfContent {
   /// PDFのダウンロードURL
   final String url;
 
+  /// 公開開始日時（null = 制限なし）
+  final DateTime? availableFrom;
+
+  /// 公開終了日時（null = 制限なし）
+  final DateTime? availableTo;
+
+  /// スクリーンショット・録画を OS レベルで抑止するかどうか
+  final bool preventCapture;
+
   /// ローカルモード時に参照するアセットパス（URL のファイル名から導出）
   String get assetPath {
     final filename = url.split('/').last;
@@ -35,6 +57,21 @@ class PdfContent {
 
   /// プレビュー画像のアセットパス（将来的にはAPIから取得した画像URLに置き換え予定）
   final String previewImageAsset;
+
+  /// 指定日時における表示期間の状態を返す。
+  AvailabilityStatus availabilityStatusAt(DateTime now) {
+    if (availableFrom != null && now.isBefore(availableFrom!)) {
+      return AvailabilityStatus.notYet;
+    }
+    if (availableTo != null && now.isAfter(availableTo!)) {
+      return AvailabilityStatus.expired;
+    }
+    return AvailabilityStatus.available;
+  }
+
+  /// 指定日時に閲覧可能かどうかを返す。
+  bool isAvailableAt(DateTime now) =>
+      availabilityStatusAt(now) == AvailabilityStatus.available;
 
   /// JSONオブジェクトから PdfContent インスタンスを生成するファクトリコンストラクタ。
   factory PdfContent.fromJson(Map<String, dynamic> json) => PdfContent(
@@ -45,6 +82,13 @@ class PdfContent {
         url: json['url'] as String,
         previewImageAsset: json['previewImage'] as String? ??
             'assets/previews/${json['id']}.png',
+        availableFrom: json['availableFrom'] != null
+            ? DateTime.parse(json['availableFrom'] as String)
+            : null,
+        availableTo: json['availableTo'] != null
+            ? DateTime.parse(json['availableTo'] as String)
+            : null,
+        preventCapture: json['preventCapture'] as bool? ?? false,
       );
 }
 

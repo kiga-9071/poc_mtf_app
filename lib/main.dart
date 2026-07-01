@@ -5,6 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'src/controllers/locale_controller.dart';
 import 'src/controllers/theme_controller.dart';
+import 'src/entities/viewer_args.dart';
 import 'src/l10n.dart';
 import 'src/pages/content_list/content_list_page.dart';
 import 'src/pages/pdf_viewer/pdf_viewer_page.dart';
@@ -26,11 +27,22 @@ final _router = GoRouter(
     GoRoute(
       path: '/viewer',
       pageBuilder: (context, state) {
-        // state.extra でコンテンツ一覧から渡されたローカルファイルパスを受け取る
-        // 端末からファイルを直接開く場合は null になる
-        final filePath = state.extra as String?;
+        final extra = state.extra;
+        final String? filePath;
+        final bool preventCapture;
+        if (extra is ViewerArgs) {
+          filePath = extra.filePath;
+          preventCapture = extra.preventCapture;
+        } else {
+          // 後方互換: String を直接渡してきた場合（端末ファイルピッカーなど）
+          filePath = extra as String?;
+          preventCapture = false;
+        }
         return NoTransitionPage(
-          child: PdfViewerPage(initialFilePath: filePath),
+          child: PdfViewerPage(
+            initialFilePath: filePath,
+            preventCapture: preventCapture,
+          ),
         );
       },
     ),

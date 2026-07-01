@@ -26,6 +26,7 @@ dependencies:
   flutter_tts: ^4.2.0
   google_mlkit_text_recognition: ^0.13.0
   background_downloader: ^9.0.0
+  screen_protector: ^1.5.2
 
 dev_dependencies:
   flutter_test:

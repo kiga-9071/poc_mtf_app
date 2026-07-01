@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../controllers/source_mode_controller.dart';
 import '../../entities/pdf_content.dart';
+import '../../entities/viewer_args.dart';
 import '../../l10n.dart';
 
 /// テキスト情報を中心としたリスト表示用のカードウィジェット。
@@ -19,6 +20,7 @@ class ContentListCard extends HookConsumerWidget {
     super.key,
     required this.content,
     required this.langCode,
+    required this.isAvailable,
   });
 
   /// 表示するコンテンツの情報
@@ -26,6 +28,9 @@ class ContentListCard extends HookConsumerWidget {
 
   /// 現在の表示言語コード（ファイル保存パスの生成に使用）
   final String langCode;
+
+  /// 表示期間内かどうか（false の場合はダウンロード・閲覧を無効化）
+  final bool isAvailable;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -77,7 +82,7 @@ class ContentListCard extends HookConsumerWidget {
           if (context.mounted) {
             isDownloading.value = false;
             if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
-            context.go('/viewer', extra: path);
+            context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
           }
         } catch (e) {
           if (context.mounted) {
@@ -115,7 +120,7 @@ class ContentListCard extends HookConsumerWidget {
           case TaskStatus.complete:
             isDownloading.value = false;
             if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
-            context.go('/viewer', extra: path);
+            context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
           case TaskStatus.canceled:
             isDownloading.value = false;
             progress.value = 0;
@@ -229,6 +234,27 @@ class ContentListCard extends HookConsumerWidget {
                     ),
                   ),
                 ],
+                // 公開期間外バッジ
+                if (!isAvailable) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.red.shade300),
+                    ),
+                    child: Text(
+                      content.availableTo != null &&
+                              DateTime.now().isAfter(content.availableTo!)
+                          ? l10n.contentExpired
+                          : l10n.contentNotYet,
+                      style:
+                          TextStyle(fontSize: 10, color: Colors.red.shade700),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 // 削除ボタン（ダウンロード済みの場合のみ）
                 if (downloaded)
@@ -268,14 +294,26 @@ class ContentListCard extends HookConsumerWidget {
                   ),
                 ],
               ),
-            ] else if (downloaded)
+            ] else if (!isAvailable)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.lock_outline),
+                  label: Text(l10n.contentUnavailableButton),
+                  onPressed: null,
+                ),
+              )
+            else if (downloaded)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.menu_book),
                   label: Text(l10n.open),
                   onPressed: path != null
-                      ? () => context.go('/viewer', extra: path)
+                      ? () => context.go('/viewer',
+                          extra: ViewerArgs(
+                              filePath: path,
+                              preventCapture: content.preventCapture))
                       : null,
                 ),
               )

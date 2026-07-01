@@ -188,6 +188,17 @@ class AppL10n {
   /// プレビューカードでPDF未ダウンロード時に表示するラベル
   String get notDownloaded => _ja ? '未ダウンロード' : 'Not Downloaded';
 
+  // ── 表示期間制御 ──────────────────────────────────────────────────────────
+
+  /// 公開開始前バッジのラベル
+  String get contentNotYet => _ja ? '公開前' : 'Coming Soon';
+
+  /// 公開終了バッジのラベル
+  String get contentExpired => _ja ? '公開終了' : 'Expired';
+
+  /// 公開期間外の閲覧不可ボタンのラベル
+  String get contentUnavailableButton => _ja ? '閲覧不可' : 'Unavailable';
+
   // ── テーマ設定 ────────────────────────────────────────────────────────────
 
   /// 読み上げ開始ボタンのツールチップ
