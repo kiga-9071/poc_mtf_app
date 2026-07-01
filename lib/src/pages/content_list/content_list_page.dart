@@ -284,7 +284,7 @@ class ContentListPage extends HookConsumerWidget {
           // ── テスト用: ストレージ初期化ボタン ───────────────────────────────
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
               border: Border(
                 top: BorderSide(color: Theme.of(context).dividerColor),
