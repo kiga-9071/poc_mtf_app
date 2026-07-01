@@ -1,7 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:mock_server/pdf_asset_server.dart';
 
 import 'src/controllers/locale_controller.dart';
 import 'src/controllers/theme_controller.dart';
@@ -20,10 +25,7 @@ import 'src/webview/webview_page.dart';
 final _router = GoRouter(
   initialLocation: '/',
   routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const ContentListPage(),
-    ),
+    GoRoute(path: '/', builder: (context, state) => const ContentListPage()),
     GoRoute(
       path: '/viewer',
       pageBuilder: (context, state) {
@@ -59,9 +61,68 @@ final _router = GoRouter(
 
 // ── エントリーポイント ─────────────────────────────────────────────────────────
 
-void main() {
+/// アプリ内 PDF サーバーのシングルトン。ホットリスタートでの二重バインドを防ぐためトップレベルで保持する。
+final _pdfServer = PdfAssetServer();
+
+/// [url] の末尾パスセグメントをファイル名として返す。[Uri.parse] 失敗時は `/` 分割でフォールバック。
+String _filenameFromUrl(String url) {
+  try {
+    final uri = Uri.parse(url);
+    if (uri.pathSegments.isNotEmpty) {
+      return uri.pathSegments.last;
+    }
+  } catch (_) {
+    // URL として解釈できない場合は末尾セグメントをフォールバック利用する。
+  }
+  return url.split('/').last;
+}
+
+/// `contents.json` を唯一の真実源として配信対象 PDF を特定し、[_pdfServer] を起動する。
+///
+/// assets のロードに失敗してもアプリ起動は継続する（サーバーモードでのダウンロードのみ失敗）。
+Future<void> _startPdfServer() async {
+  try {
+    final raw = await rootBundle.loadString(
+      'packages/mock_server/assets/contents.json',
+    );
+    final data = jsonDecode(raw) as Map<String, dynamic>;
+
+    final filenames = <String>{};
+    for (final value in data.values) {
+      final items = value as List<dynamic>;
+      for (final item in items) {
+        final url = (item as Map<String, dynamic>)['url'] as String;
+        filenames.add(_filenameFromUrl(url));
+      }
+    }
+
+    final cache = <String, Uint8List>{};
+
+    // contents.json として配信する
+    cache['contents.json'] = Uint8List.fromList(utf8.encode(raw));
+
+    for (final filename in filenames) {
+      try {
+        final asset = await rootBundle.load(
+          'packages/mock_server/assets/pdfs/$filename',
+        );
+        cache[filename] = asset.buffer.asUint8List();
+      } catch (_) {
+        // アセットに存在しないファイルはスキップする。
+        debugPrint('PDF server: skipping missing asset "$filename"');
+      }
+    }
+
+    await _pdfServer.start(cache);
+  } catch (e, st) {
+    debugPrint('PDF server start failed: $e\n$st');
+  }
+}
+
+Future<void> main() async {
   // Flutter エンジンの初期化（SharedPreferences など非同期処理の前に必要）
   WidgetsFlutterBinding.ensureInitialized();
+  await _startPdfServer();
 
   // 16ms を超えたフレームをログ出力（ページ送り・ズームなどの応答速度計測用）
   WidgetsBinding.instance.addTimingsCallback((timings) {
@@ -83,61 +144,61 @@ void main() {
 /// AppBar や ボタン・FAB などのカラーは赤 (#CC0000) をブランドカラーとして統一。
 /// [scheme] に渡す ColorScheme の brightness によってライト／ダークが切り替わる。
 ThemeData _buildTheme(ColorScheme scheme) => ThemeData(
-      colorScheme: scheme,
-      useMaterial3: true,
-      appBarTheme: AppBarTheme(
-        // ライト: 白背景・黒文字 / ダーク: 濃いグレー背景・白文字
-        backgroundColor: scheme.brightness == Brightness.dark
-            ? const Color(0xFF1E1E1E)
-            : Colors.white,
-        foregroundColor: scheme.brightness == Brightness.dark
-            ? Colors.white
-            : Colors.black,
-        iconTheme: IconThemeData(
-          color: scheme.brightness == Brightness.dark
-              ? Colors.white
-              : Colors.black,
-        ),
-        actionsIconTheme: IconThemeData(
-          color: scheme.brightness == Brightness.dark
-              ? Colors.white
-              : Colors.black,
-        ),
-        titleTextStyle: TextStyle(
-          color: scheme.brightness == Brightness.dark
-              ? Colors.white
-              : Colors.black,
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-        ),
-        elevation: 0,
-        // スクロール時に影を出して AppBar とコンテンツを区別する
-        scrolledUnderElevation: 1,
-        surfaceTintColor: Colors.transparent,
-      ),
-      // ElevatedButton: 赤背景・白文字で統一
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFCC0000),
-          foregroundColor: Colors.white,
-        ),
-      ),
-      // FAB（フローティングアクションボタン）: 赤背景・白アイコン
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: Color(0xFFCC0000),
-        foregroundColor: Colors.white,
-      ),
-      // CircularProgressIndicator のカラー
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: Color(0xFFCC0000),
-      ),
-      // TabBar（ドロワー内の目次／ブックマーク／検索タブ）のカラー
-      tabBarTheme: TabBarThemeData(
-        labelColor: scheme.brightness == Brightness.dark ? Colors.white : Colors.black,
-        unselectedLabelColor: scheme.brightness == Brightness.dark ? Colors.white60 : Colors.black54,
-        indicatorColor: scheme.brightness == Brightness.dark ? Colors.white : Colors.black,
-      ),
-    );
+  colorScheme: scheme,
+  useMaterial3: true,
+  appBarTheme: AppBarTheme(
+    // ライト: 白背景・黒文字 / ダーク: 濃いグレー背景・白文字
+    backgroundColor: scheme.brightness == Brightness.dark
+        ? const Color(0xFF1E1E1E)
+        : Colors.white,
+    foregroundColor: scheme.brightness == Brightness.dark
+        ? Colors.white
+        : Colors.black,
+    iconTheme: IconThemeData(
+      color: scheme.brightness == Brightness.dark ? Colors.white : Colors.black,
+    ),
+    actionsIconTheme: IconThemeData(
+      color: scheme.brightness == Brightness.dark ? Colors.white : Colors.black,
+    ),
+    titleTextStyle: TextStyle(
+      color: scheme.brightness == Brightness.dark ? Colors.white : Colors.black,
+      fontSize: 18,
+      fontWeight: FontWeight.w600,
+    ),
+    elevation: 0,
+    // スクロール時に影を出して AppBar とコンテンツを区別する
+    scrolledUnderElevation: 1,
+    surfaceTintColor: Colors.transparent,
+  ),
+  // ElevatedButton: 赤背景・白文字で統一
+  elevatedButtonTheme: ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFFCC0000),
+      foregroundColor: Colors.white,
+    ),
+  ),
+  // FAB（フローティングアクションボタン）: 赤背景・白アイコン
+  floatingActionButtonTheme: const FloatingActionButtonThemeData(
+    backgroundColor: Color(0xFFCC0000),
+    foregroundColor: Colors.white,
+  ),
+  // CircularProgressIndicator のカラー
+  progressIndicatorTheme: const ProgressIndicatorThemeData(
+    color: Color(0xFFCC0000),
+  ),
+  // TabBar（ドロワー内の目次／ブックマーク／検索タブ）のカラー
+  tabBarTheme: TabBarThemeData(
+    labelColor: scheme.brightness == Brightness.dark
+        ? Colors.white
+        : Colors.black,
+    unselectedLabelColor: scheme.brightness == Brightness.dark
+        ? Colors.white60
+        : Colors.black54,
+    indicatorColor: scheme.brightness == Brightness.dark
+        ? Colors.white
+        : Colors.black,
+  ),
+);
 
 // ── ルートウィジェット ─────────────────────────────────────────────────────────
 
@@ -172,16 +233,20 @@ class MyApp extends ConsumerWidget {
       // テーマモードの設定（system の場合は端末設定に自動追従）
       themeMode: themeMode,
       // ライトモード用テーマ（brightness: light の ColorScheme を使用）
-      theme: _buildTheme(ColorScheme.fromSeed(
-        seedColor: const Color(0xFFCC0000),
-        primary: const Color(0xFFCC0000),
-        onPrimary: Colors.white,
-      )),
+      theme: _buildTheme(
+        ColorScheme.fromSeed(
+          seedColor: const Color(0xFFCC0000),
+          primary: const Color(0xFFCC0000),
+          onPrimary: Colors.white,
+        ),
+      ),
       // ダークモード用テーマ（brightness: dark の ColorScheme を使用）
-      darkTheme: _buildTheme(ColorScheme.fromSeed(
-        seedColor: const Color(0xFFCC0000),
-        brightness: Brightness.dark,
-      )),
+      darkTheme: _buildTheme(
+        ColorScheme.fromSeed(
+          seedColor: const Color(0xFFCC0000),
+          brightness: Brightness.dark,
+        ),
+      ),
       // 画面遷移の設定（上記 _router を使用）
       routerConfig: _router,
     );

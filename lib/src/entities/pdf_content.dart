@@ -49,12 +49,6 @@ class PdfContent {
   /// スクリーンショット・録画を OS レベルで抑止するかどうか
   final bool preventCapture;
 
-  /// ローカルモード時に参照するアセットパス（URL のファイル名から導出）
-  String get assetPath {
-    final filename = url.split('/').last;
-    return 'assets/pdfs/$filename';
-  }
-
   /// プレビュー画像のアセットパス（将来的にはAPIから取得した画像URLに置き換え予定）
   final String previewImageAsset;
 
@@ -75,21 +69,21 @@ class PdfContent {
 
   /// JSONオブジェクトから PdfContent インスタンスを生成するファクトリコンストラクタ。
   factory PdfContent.fromJson(Map<String, dynamic> json) => PdfContent(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        description: json['description'] as String,
-        category: json['category'] as String,
-        url: json['url'] as String,
-        previewImageAsset: json['previewImage'] as String? ??
-            'assets/previews/${json['id']}.png',
-        availableFrom: json['availableFrom'] != null
-            ? DateTime.parse(json['availableFrom'] as String)
-            : null,
-        availableTo: json['availableTo'] != null
-            ? DateTime.parse(json['availableTo'] as String)
-            : null,
-        preventCapture: json['preventCapture'] as bool? ?? false,
-      );
+    id: json['id'] as String,
+    title: json['title'] as String,
+    description: json['description'] as String,
+    category: json['category'] as String,
+    url: json['url'] as String,
+    previewImageAsset: json['previewImage'] as String? ??
+        'packages/mock_server/assets/previews/${json['id']}.png',
+    availableFrom: json['availableFrom'] != null
+        ? DateTime.parse(json['availableFrom'] as String)
+        : null,
+    availableTo: json['availableTo'] != null
+        ? DateTime.parse(json['availableTo'] as String)
+        : null,
+    preventCapture: json['preventCapture'] as bool? ?? false,
+  );
 }
 
 /// ダウンロード済みPDFのローカル保存パスを生成する。

@@ -2,13 +2,11 @@ import 'dart:io';
 
 import 'package:background_downloader/background_downloader.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../controllers/source_mode_controller.dart';
 import '../../entities/pdf_content.dart';
 import '../../entities/viewer_args.dart';
 import '../../l10n.dart';
@@ -41,7 +39,6 @@ class ContentPreviewCard extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
-    final sourceMode = ref.watch(sourceModeProvider);
     // ダークモード判定（PDFサムネイルの背景色切替に使用）
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -80,29 +77,7 @@ class ContentPreviewCard extends HookConsumerWidget {
       isDownloading.value = true;
       progress.value = 0;
 
-      // ローカルモード: アセットからコピー
-      if (sourceMode == SourceMode.local) {
-        try {
-          final data = await rootBundle.load(content.assetPath);
-          await File(path).writeAsBytes(data.buffer.asUint8List());
-          if (context.mounted) {
-            isDownloading.value = false;
-            if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
-            context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
-          }
-        } catch (e) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l10n.errorMsg('$e'))),
-            );
-            isDownloading.value = false;
-            progress.value = 0;
-          }
-        }
-        return;
-      }
-
-      // サーバーモード: background_downloader でバックグラウンドダウンロード
+      // background_downloader でバックグラウンドダウンロード
       final taskId = '${content.id}_$langCode';
       currentTaskId.value = taskId;
       try {

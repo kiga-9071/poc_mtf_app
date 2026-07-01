@@ -1,0 +1,21 @@
+name: mock_server
+description: In-app PDF dev server (shelf) replacing start_server.py
+version: 1.0.0
+
+environment:
+  sdk: '>=3.12.0 <4.0.0'
+  flutter: '>=3.44.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shelf: ^1.4.0
+
+dev_dependencies:
+  flutter_lints: ^3.0.0
+
+flutter:
+  assets:
+    - assets/
+    - assets/pdfs/
+    - assets/previews/

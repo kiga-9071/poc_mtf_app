@@ -8,37 +8,57 @@ environment:
   flutter: '>=3.44.0'
 
 dependencies:
+  # Flutter SDK
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+
+  # 状態管理
   hooks_riverpod: ^2.6.1
   flutter_hooks: ^0.20.5
   riverpod_annotation: ^2.6.1
   freezed_annotation: ^3.1.0
+
+  # ナビゲーション
+  go_router: ^14.6.1
+
+  # PDF ビューア
   pdfrx: ^1.0.0
+
+  # ファイル・ストレージ
   path_provider: ^2.1.5
   file_picker: ^8.0.0
-  dio: ^5.7.0
-  go_router: ^14.6.1
-  flutter_inappwebview: ^6.1.5
   shared_preferences: ^2.5.5
-  flutter_tts: ^4.2.0
-  google_mlkit_text_recognition: ^0.13.0
+
+  # ネットワーク・ダウンロード
+  dio: ^5.7.0
   background_downloader: ^9.0.0
   screen_protector: ^1.5.2
 
+  # WebView
+  flutter_inappwebview: ^6.1.5
+
+  # テキスト認識・読み上げ
+  google_mlkit_text_recognition: ^0.13.0
+  flutter_tts: ^4.2.0
+
+  # 開発用モックサーバー
+  mock_server:
+    path: ./mock_server
+
 dev_dependencies:
+  # テスト
   flutter_test:
     sdk: flutter
+
+  # コード生成
   build_runner: ^2.4.15
   freezed: ^3.0.6
   riverpod_generator: ^2.6.5
+
+  # Lint
   flutter_lints: ^3.0.0
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/
-    - assets/previews/
-    - assets/pdfs/
