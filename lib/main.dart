@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -122,6 +123,7 @@ Future<void> _startPdfServer() async {
 Future<void> main() async {
   // Flutter エンジンの初期化（SharedPreferences など非同期処理の前に必要）
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   await _startPdfServer();
 
   // 16ms を超えたフレームをログ出力（ページ送り・ズームなどの応答速度計測用）

@@ -1,4 +1,4 @@
-package com.example.pdf_app
+package jp.co.pdf.example.dev
 
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
@@ -7,7 +7,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     companion object {
-        private const val CHANNEL = "com.example.pdf_app/capture_protection"
+        private const val CHANNEL = "jp.co.pdf.example.dev/capture_protection"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

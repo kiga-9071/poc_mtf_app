@@ -16,7 +16,7 @@ class CaptureProtectionService {
   CaptureProtectionService._();
 
   static const _channel =
-      MethodChannel('com.example.pdf_app/capture_protection');
+      MethodChannel('jp.co.pdf.example.dev/capture_protection');
 
   static Future<void> enable() async {
     if (Platform.isAndroid) {

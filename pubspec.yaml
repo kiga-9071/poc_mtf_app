@@ -1,6 +1,6 @@
 name: pdf_app
 description: PDFアプリ
-version: 6.1.0
+version: 1.0.0
 publish_to: none
 
 environment:
@@ -36,6 +36,9 @@ dependencies:
   background_downloader: ^9.0.0
   screen_protector: ^1.5.2
 
+  # Firebase
+  firebase_core: ^2.27.0
+
   # WebView
   flutter_inappwebview: ^6.1.5
 
@@ -52,6 +55,9 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
+  # アイコン生成
+  flutter_launcher_icons: ^0.14.3
+
   # コード生成
   build_runner: ^2.4.15
   freezed: ^3.0.6
@@ -62,3 +68,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
