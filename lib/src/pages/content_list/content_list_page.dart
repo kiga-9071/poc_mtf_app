@@ -10,7 +10,7 @@ import '../../controllers/content_master_controller.dart';
 import '../../controllers/locale_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../l10n.dart';
-import 'content_list_card.dart';
+import 'content_featured_card.dart';
 import 'content_preview_card.dart';
 
 // ── 表示モード ────────────────────────────────────────────────────────────────
@@ -203,53 +203,77 @@ class ContentListPage extends HookConsumerWidget {
       _ => Icons.brightness_auto,
     };
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.contentList),
-        actions: [
-          // 表示モード切替ボタン
-          IconButton(
-            icon: Icon(
-              viewMode.value == _ViewMode.list
-                  ? Icons.grid_view
-                  : Icons.view_list,
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.contentList),
+          bottom: TabBar(
+            tabs: [
+              Tab(text: l10n.tabMagazine),
+              Tab(text: l10n.tabShop),
+              Tab(text: l10n.tabYoutube),
+            ],
+          ),
+          actions: [
+            // 表示モード切替ボタン
+            IconButton(
+              icon: Icon(
+                viewMode.value == _ViewMode.list
+                    ? Icons.grid_view
+                    : Icons.view_list,
+              ),
+              tooltip: viewMode.value == _ViewMode.list
+                  ? l10n.switchToPreview
+                  : l10n.switchToList,
+              onPressed: () {
+                viewMode.value = viewMode.value == _ViewMode.list
+                    ? _ViewMode.preview
+                    : _ViewMode.list;
+              },
             ),
-            tooltip: viewMode.value == _ViewMode.list
-                ? l10n.switchToPreview
-                : l10n.switchToList,
-            onPressed: () {
-              viewMode.value = viewMode.value == _ViewMode.list
-                  ? _ViewMode.preview
-                  : _ViewMode.list;
-            },
-          ),
-          // テーマ切替ボタン
-          IconButton(
-            icon: Icon(themeIcon),
-            tooltip: l10n.themeLabel,
-            onPressed: () => showThemeModeDialog(context, ref),
-          ),
-          // 言語切替ボタン
-          IconButton(
-            icon: const Icon(Icons.language),
-            tooltip: l10n.language,
-            onPressed: () => showLanguageDialog(context, ref),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: masterAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) =>
-                  Center(child: Text(l10n.loadError('$err'))),
-              data: (master) {
-                final contents = master.contentsFor(locale.languageCode);
-                final now = master.now;
-                return viewMode.value == _ViewMode.preview
-                    // プレビューモード: 3列グリッドでPDFサムネイルを表示
-                    ? GridView.builder(
+            // テーマ切替ボタン
+            IconButton(
+              icon: Icon(themeIcon),
+              tooltip: l10n.themeLabel,
+              onPressed: () => showThemeModeDialog(context, ref),
+            ),
+            // 言語切替ボタン
+            IconButton(
+              icon: const Icon(Icons.language),
+              tooltip: l10n.language,
+              onPressed: () => showLanguageDialog(context, ref),
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: TabBarView(
+                children: [
+                  // ── 機内誌タブ ─────────────────────────────────────────────
+                  masterAsync.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (err, _) =>
+                        Center(child: Text(l10n.loadError('$err'))),
+                    data: (master) {
+                      final contents = master.contentsFor(locale.languageCode);
+                      final now = master.now;
+                      // category が「機内誌」または「In-flight Magazine」のコンテンツを先頭表示
+                      final featured = contents.where((c) =>
+                          c.category == '機内誌' ||
+                          c.category == 'In-flight Magazine').firstOrNull;
+                      if (featured != null) {
+                        return ContentFeaturedCard(
+                          key: ValueKey('featured_${reloadKey.value}'),
+                          content: featured,
+                          langCode: locale.languageCode,
+                          isAvailable: featured.isAvailableAt(now),
+                        );
+                      }
+                      // 機内誌カテゴリーがない場合は通常グリッド表示にフォールバック
+                      return GridView.builder(
                         padding: const EdgeInsets.all(8),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
@@ -265,50 +289,74 @@ class ContentListPage extends HookConsumerWidget {
                           langCode: locale.languageCode,
                           isAvailable: contents[index].isAvailableAt(now),
                         ),
-                      )
-                    // リストモード: テキスト情報を中心とした縦スクロールリスト
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: contents.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (context, index) => ContentListCard(
-                          key: ValueKey('${reloadKey.value}_$index'),
-                          content: contents[index],
-                          langCode: locale.languageCode,
-                          isAvailable: contents[index].isAvailableAt(now),
-                        ),
                       );
-              },
-            ),
-          ),
-          // ── テスト用: ストレージ初期化ボタン ───────────────────────────────
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(color: Theme.of(context).dividerColor),
+                    },
+                  ),
+                  // ── SHOPタブ ──────────────────────────────────────────────
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.shopping_bag_outlined,
+                            size: 64,
+                            color: Theme.of(context).disabledColor),
+                        const SizedBox(height: 16),
+                        Text(l10n.comingSoon,
+                            style: TextStyle(
+                                fontSize: 18,
+                                color: Theme.of(context).disabledColor)),
+                      ],
+                    ),
+                  ),
+                  // ── Youtubeタブ ───────────────────────────────────────────
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.smart_display_outlined,
+                            size: 64,
+                            color: Theme.of(context).disabledColor),
+                        const SizedBox(height: 16),
+                        Text(l10n.comingSoon,
+                            style: TextStyle(
+                                fontSize: 18,
+                                color: Theme.of(context).disabledColor)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.delete_sweep, color: Colors.red),
-              label: const Text(
-                'ストレージを初期化 (テスト用)',
-                style: TextStyle(color: Colors.red),
+            // ── テスト用: ストレージ初期化ボタン ───────────────────────────
+            Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Theme.of(context).dividerColor),
+                ),
               ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.delete_sweep, color: Colors.red),
+                label: const Text(
+                  'ストレージを初期化 (テスト用)',
+                  style: TextStyle(color: Colors.red),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red),
+                ),
+                onPressed: () async {
+                  await resetStorage(context);
+                  if (context.mounted) {
+                    reloadKey.value++;
+                    ref.read(contentMasterProvider.notifier).refresh();
+                  }
+                },
               ),
-              onPressed: () async {
-                await resetStorage(context);
-                if (context.mounted) {
-                  reloadKey.value++;
-                  ref.read(contentMasterProvider.notifier).refresh();
-                }
-              },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
