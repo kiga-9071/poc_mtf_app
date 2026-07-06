@@ -52,7 +52,19 @@ class AppL10n {
   // ── コンテンツ一覧画面 ────────────────────────────────────────────────────
 
   /// コンテンツ一覧画面のタイトル
-  String get contentList => _ja ? 'コンテンツ一覧' : 'Content List';
+  String get contentList => _ja ? '機内を楽しむ' : 'Enjoy In-Flight';
+
+  /// 機内誌タブのラベル
+  String get tabMagazine => _ja ? '機内誌' : 'Magazine';
+
+  /// SHOPタブのラベル
+  String get tabShop => 'SHOP';
+
+  /// YoutubeタブのラベルL
+  String get tabYoutube => 'Youtube';
+
+  /// 準備中メッセージ
+  String get comingSoon => _ja ? '準備中' : 'Coming Soon';
 
   /// ダウンロード済みを示すバッジのラベル
   String get saved => _ja ? '保存済み' : 'Saved';
