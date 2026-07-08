@@ -2,6 +2,7 @@ import 'dart:collection';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -175,14 +176,14 @@ class PdfViewerPage extends HookConsumerWidget {
         ttsHighlightEnd.value = null;
         ttsPageText.value = null;
       }
-      tts.setCompletionHandler(resetTts);
+      // キャンセル・エラー時のフォールバックリセット
+      // （completionHandler と progressHandler はセッションごとに toggleTts で登録する）
       tts.setCancelHandler(resetTts);
       tts.setErrorHandler((_) => resetTts());
-      // 読み上げ中の単語位置をハイライト更新する
-      tts.setProgressHandler((_, start, end, __) {
-        ttsHighlightStart.value = start;
-        ttsHighlightEnd.value = end;
-      });
+      // iOS: オーディオセッションを有効化しないと音声が出ない場合がある
+      if (Platform.isIOS) {
+        tts.setSharedInstance(true);
+      }
       return () { tts.stop(); };
     }, []);
 
@@ -311,22 +312,43 @@ class PdfViewerPage extends HookConsumerWidget {
         final pageText = await page.loadText();
         final nativeText = pageText.fullText.trim();
         debugPrint('[TTS] loadText length=${nativeText.length}, lang=$langCode');
+        debugPrint('[TTS] nativeText[:80]="${nativeText.substring(0, nativeText.length.clamp(0, 80))}"');
 
+        bool usedOcr;
         String speakText;
         if (nativeText.isNotEmpty) {
-          // テキスト層あり → ハイライト対応
+          // フラグメントを座標でソートして視覚的な読み順に並べ直す
+          usedOcr = false;
           ttsPageText.value = pageText;
-          speakText = nativeText;
+          speakText = _extractTtsText(pageText);
         } else {
-          // テキスト層なし → OCR フォールバック（ハイライトなし）
-          // ビューアーのdocインスタンスと分離するため、ファイルパスを渡して独立ロード
+          // テキスト層なし → iOS は PDFKit でテキスト抽出を試みる
+          usedOcr = false;
+          speakText = '';
           final filePath = selectedFile.value?.path;
-          if (filePath == null) {
-            speakText = '';
-          } else {
-            speakText = await _extractTextByOcr(filePath, currentPage.value - 1, langCode);
+          if (filePath != null && Platform.isIOS) {
+            const _kPdfChannel = MethodChannel('app.tts.pdf');
+            try {
+              final pdfKitText = await _kPdfChannel.invokeMethod<String>(
+                    'extractText',
+                    {'filePath': filePath, 'pageIndex': currentPage.value - 1},
+                  ) ?? '';
+              debugPrint('[TTS] PDFKit result length=${pdfKitText.length}');
+              if (pdfKitText.trim().isNotEmpty) {
+                speakText = pdfKitText.trim();
+              }
+            } catch (e) {
+              debugPrint('[TTS] PDFKit error: $e');
+            }
           }
-          debugPrint('[TTS] OCR result length=${speakText.length}');
+          // PDFKit でも取得できなければ OCR フォールバック
+          if (speakText.isEmpty) {
+            usedOcr = true;
+            if (filePath != null) {
+              speakText = await _extractTextByOcr(filePath, currentPage.value - 1, langCode);
+            }
+            debugPrint('[TTS] OCR result length=${speakText.length}');
+          }
         }
 
         if (speakText.isEmpty) {
@@ -339,28 +361,110 @@ class PdfViewerPage extends HookConsumerWidget {
           return;
         }
 
-        await tts.setLanguage(langCode == 'ja' ? 'ja-JP' : 'en-US');
+        // ネイティブテキストパスで日本語が検出されない場合、フォントのToUnicode不足の可能性があるためOCRにフォールバック
+        if (!usedOcr &&
+            langCode == 'ja' &&
+            !speakText.contains(RegExp(r'[぀-ゟ゠-ヿ一-龯]'))) {
+          final filePath = selectedFile.value?.path;
+          if (filePath != null) {
+            debugPrint('[TTS] native text has no Japanese (ToUnicode missing?), trying OCR fallback');
+            final ocrText = await _extractTextByOcr(
+                filePath, currentPage.value - 1, langCode);
+            debugPrint('[TTS] OCR fallback length=${ocrText.length}');
+            if (ocrText.isNotEmpty) {
+              speakText = ocrText;
+              usedOcr = true;
+              ttsPageText.value = null; // OCRパスではハイライト不可
+            }
+          }
+        }
 
-        // 読み上げ中の単語ハイライト（テキスト層がある場合のみ有効）
-        tts.setProgressHandler((text, start, end, word) {
+        // ── テキスト診断ログ ──────────────────────────────────────────
+        final hasJapanese = speakText.contains(
+          RegExp(r'[぀-ゟ゠-ヿ一-龯]'),
+        );
+        final useJapanese = langCode == 'ja' || hasJapanese;
+        debugPrint('[TTS] hasJapanese=$hasJapanese useJapanese=$useJapanese '
+            'speakLen=${speakText.length}');
+        debugPrint('[TTS] speakText[:100]="${speakText.substring(0, speakText.length.clamp(0, 100))}"');
+        // ─────────────────────────────────────────────────────────────
+
+        if (Platform.isIOS && useJapanese) {
+          // clearVoice で前回の音声設定をリセットしてから日本語音声を指定する。
+          // flutter_tts 4.2.5 は identifier があれば AVSpeechSynthesisVoice(identifier:)
+          // で音声を確定できるため、name+locale の文字列一致より確実。
+          await tts.clearVoice();
+          final rawVoices = await tts.getVoices;
+          final voices =
+              (rawVoices as List?)?.cast<Map<dynamic, dynamic>>() ?? [];
+          final jaVoices = voices
+              .where((v) => (v['locale'] as String? ?? '').startsWith('ja'))
+              .toList();
+          debugPrint('[TTS] iOS ja voices: '
+              '${jaVoices.map((v) => '${v['name']}(${v['quality']})').toList()}');
+
+          // compact（OS 標準）を優先し、なければ先頭の日本語音声を使う
+          Map<dynamic, dynamic>? jaVoice;
+          for (final v in jaVoices) {
+            if ((v['quality'] as String? ?? '') == 'compact') {
+              jaVoice = v;
+              break;
+            }
+          }
+          jaVoice ??= jaVoices.isNotEmpty ? jaVoices.first : null;
+
+          if (jaVoice != null) {
+            final r = await tts.setVoice({
+              'name': jaVoice['name'].toString(),
+              'locale': jaVoice['locale'].toString(),
+              'identifier': (jaVoice['identifier'] ?? '').toString(),
+            });
+            debugPrint('[TTS] iOS setVoice result=$r '
+                'name=${jaVoice['name']} id=${jaVoice['identifier']}');
+            if (r != 1) {
+              // setVoice 失敗時は setLanguage にフォールバック
+              final lr = await tts.setLanguage('ja-JP');
+              debugPrint('[TTS] iOS setLanguage fallback result=$lr');
+            }
+          } else {
+            final lr = await tts.setLanguage('ja-JP');
+            debugPrint('[TTS] iOS no ja voice, setLanguage result=$lr');
+          }
+        } else {
+          await tts.setLanguage(useJapanese ? 'ja-JP' : 'en-US');
+        }
+
+        // iOS の AVSpeechSynthesizer は長文で途中停止するため、チャンク分割して逐次読み上げる
+        final chunks = _buildTtsChunks(speakText);
+        var chunkIndex = 0;
+        debugPrint('[TTS] chunks=${chunks.length}, total=${speakText.length}chars');
+
+        // チャンク完了時に次チャンクへ進む。最終チャンクで状態をリセット。
+        tts.setCompletionHandler(() {
           if (!context.mounted) return;
-          if (ttsPageText.value != null) {
+          chunkIndex++;
+          if (chunkIndex < chunks.length &&
+              ttsStatus.value == TtsStatus.speaking) {
+            tts.speak(chunks[chunkIndex]);
+          } else {
+            ttsStatus.value = TtsStatus.idle;
+            ttsHighlightStart.value = null;
+            ttsHighlightEnd.value = null;
+            ttsPageText.value = null;
+          }
+        });
+
+        // ハイライトは先頭チャンクのみ有効（チャンク境界でインデックスがリセットされるため）
+        tts.setProgressHandler((text, start, end, word) {
+          if (!context.mounted || ttsPageText.value == null) return;
+          if (chunkIndex == 0) {
             ttsHighlightStart.value = start;
             ttsHighlightEnd.value = end;
           }
         });
 
-        // 読み上げ完了時にステータスとハイライトをリセット
-        tts.setCompletionHandler(() {
-          if (!context.mounted) return;
-          ttsStatus.value = TtsStatus.idle;
-          ttsHighlightStart.value = null;
-          ttsHighlightEnd.value = null;
-          ttsPageText.value = null;
-        });
-
         ttsStatus.value = TtsStatus.speaking;
-        await tts.speak(speakText);
+        await tts.speak(chunks[0]);
       } catch (e, st) {
         debugPrint('[TTS] error: $e\n$st');
         ttsStatus.value = TtsStatus.idle;
@@ -661,6 +765,7 @@ class PdfViewerPage extends HookConsumerWidget {
                           physics: (isZoomed || count >= 2)
                               ? const NeverScrollableScrollPhysics()
                               : const PageScrollPhysics(),
+                          allowImplicitScrolling: true,
                           itemCount: doc.pages.length,
                           onPageChanged: (index) {
                             // プログラム遷移中は経由ページによる上書きを無視する
@@ -696,7 +801,7 @@ class PdfViewerPage extends HookConsumerWidget {
                               child: PdfPageView(
                                 document: doc,
                                 pageNumber: index + 1,
-                                maximumDpi: 300,
+                                maximumDpi: 150,
                                 backgroundColor:
                                     isDark ? Colors.black : Colors.white,
                                 // decorationBuilder: ページ画像の上にオーバーレイを重ねる
@@ -917,6 +1022,69 @@ class PdfViewerPage extends HookConsumerWidget {
   }
 }
 
+/// PDF のテキストフラグメントを視覚的な読み順（上→下・左→右）にソートして結合する。
+///
+/// pdfrx の [PdfPageText.fullText] はフラグメントを PDF 内部順（オブジェクト登録順）で
+/// 連結するため、複数カラムや複雑レイアウトでは視覚的な読み順と一致しない。
+/// フラグメントの [PdfRect] を使って座標ソートすることで読み順を修正する。
+///
+/// pdfrx の [PdfRect] は PDF 座標系（Y 上向き）なので top > bottom。
+/// 視覚的に上にある要素ほど top が大きいため、top **降順** → left 昇順でソートする。
+String _extractTtsText(PdfPageText pageText) {
+  final frags = List.of(pageText.fragments);
+  frags.sort((a, b) {
+    final aTop = a.bounds.top;
+    final bTop = b.bounds.top;
+    // 4pt 以内の差は同一行とみなして左→右順にする
+    if ((aTop - bTop).abs() > 4) {
+      return bTop.compareTo(aTop); // 降順（上の要素が先）
+    }
+    return a.bounds.left.compareTo(b.bounds.left);
+  });
+
+  final buf = StringBuffer();
+  for (final f in frags) {
+    buf.write(f.text);
+  }
+
+  return buf.toString()
+      // リガチャを基本文字に展開（合字が音声合成エンジンに渡ると読み飛ばされる場合がある）
+      .replaceAll('ﬁ', 'fi')
+      .replaceAll('ﬂ', 'fl')
+      .replaceAll('ﬀ', 'ff')
+      .replaceAll('ﬃ', 'ffi')
+      .replaceAll('ﬄ', 'ffl')
+      // 印刷用制御文字の除去（改行・タブ以外の非印刷可能文字）
+      .replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]'), '')
+      // 連続する空白・タブを1スペースに圧縮
+      .replaceAll(RegExp(r'[ \t]+'), ' ')
+      // 3行以上の連続改行を2行に圧縮
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
+}
+
+/// テキストを読み上げ可能なチャンクに分割する。
+///
+/// iOS の AVSpeechSynthesizer は一度に処理できる文字数に上限があり、
+/// 長文を渡すと途中で無音停止する。文末記号で区切ることで自然な区切りにする。
+List<String> _buildTtsChunks(String text, {int maxLen = 2000}) {
+  if (text.length <= maxLen) return [text];
+  final chunks = <String>[];
+  var start = 0;
+  while (start < text.length) {
+    var end = (start + maxLen).clamp(0, text.length);
+    if (end < text.length) {
+      // 文末記号（句点・感嘆符・疑問符・改行）で切ることで文中断を防ぐ
+      final cut = text.lastIndexOf(RegExp(r'[。！？\n.!?]'), end);
+      if (cut > start + maxLen ~/ 3) end = cut + 1;
+    }
+    final chunk = text.substring(start, end).trim();
+    if (chunk.isNotEmpty) chunks.add(chunk);
+    start = end;
+  }
+  return chunks.isEmpty ? [text] : chunks;
+}
+
 /// PDF ページを画像レンダリングして ML Kit OCR でテキストを抽出する。
 /// テキスト層を持たない画像型 PDF に対するフォールバック処理。
 /// ビューアーと独立した PdfDocument インスタンスを使うため render() が確実に動作する。
@@ -926,9 +1094,10 @@ Future<String> _extractTextByOcr(
   final doc = await PdfDocument.openFile(filePath);
   try {
     final page = doc.pages[pageIndex];
-    // 解像度 2x でレンダリング（OCR 精度向上のため）
-    final w = (page.width * 2).toInt();
-    final h = (page.height * 2).toInt();
+    // PDF は 72pt 基準。小さな日本語本文の認識には 432 DPI 相当の 6x でレンダリング
+    const _kOcrScale = 6.0;
+    final w = (page.width * _kOcrScale).toInt();
+    final h = (page.height * _kOcrScale).toInt();
     debugPrint('[OCR] render size=$w x $h');
     final pdfImage = await page.render(width: w, height: h);
     debugPrint('[OCR] pdfImage=${pdfImage == null ? "null" : "${pdfImage.width}x${pdfImage.height}"}');
@@ -944,6 +1113,24 @@ Future<String> _extractTextByOcr(
       final tempFile = File('${tempDir.path}/tts_ocr_page.png');
       await tempFile.writeAsBytes(byteData.buffer.asUint8List());
 
+      if (Platform.isIOS) {
+        // ML Kit iOS は日本語 OCR 精度が低いため、Apple Vision Framework を使用する
+        const _kVisionChannel = MethodChannel('app.tts.ocr');
+        try {
+          final text = await _kVisionChannel.invokeMethod<String>(
+                'recognizeText',
+                {'imagePath': tempFile.path},
+              ) ??
+              '';
+          debugPrint('[OCR] Vision result length=${text.length}');
+          return text;
+        } catch (e) {
+          debugPrint('[OCR] Vision error: $e');
+          return '';
+        }
+      }
+
+      // Android: ML Kit を使用
       final script = langCode == 'ja'
           ? TextRecognitionScript.japanese
           : TextRecognitionScript.latin;

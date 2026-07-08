@@ -13,6 +13,7 @@ import 'src/controllers/locale_controller.dart';
 import 'src/controllers/theme_controller.dart';
 import 'src/entities/viewer_args.dart';
 import 'src/l10n.dart';
+import 'src/pages/content_list/backnumber_page.dart';
 import 'src/pages/content_list/content_list_page.dart';
 import 'src/pages/pdf_viewer/pdf_viewer_page.dart';
 import 'src/webview/webview_page.dart';
@@ -27,6 +28,10 @@ final _router = GoRouter(
   initialLocation: '/',
   routes: [
     GoRoute(path: '/', builder: (context, state) => const ContentListPage()),
+    GoRoute(
+      path: '/backnumber',
+      builder: (context, state) => const BacknumberPage(),
+    ),
     GoRoute(
       path: '/viewer',
       pageBuilder: (context, state) {

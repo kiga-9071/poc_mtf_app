@@ -159,11 +159,23 @@ class ContentPreviewCard extends HookConsumerWidget {
     final downloaded = isDownloaded.value;
     final path = savedPath.value;
 
-    return Card(
-      elevation: 2,
-      // カード角丸をサムネイルにも適用するためクリップ
-      clipBehavior: Clip.antiAlias,
-      child: Column(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A2A344B),
+            blurRadius: 10,
+            spreadRadius: -2,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // ── サムネイル領域 ────────────────────────────────────────────────
@@ -223,7 +235,7 @@ class ContentPreviewCard extends HookConsumerWidget {
           SizedBox(
             height: 114,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+              padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -240,16 +252,17 @@ class ContentPreviewCard extends HookConsumerWidget {
                             Flexible(
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
+                                    horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .primaryContainer,
-                                  borderRadius: BorderRadius.circular(4),
+                                  color: const Color(0xFFE1E3E6),
+                                  borderRadius: BorderRadius.circular(24),
                                 ),
                                 child: Text(
                                   content.category,
-                                  style: const TextStyle(fontSize: 10),
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w300,
+                                      color: Colors.black),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -293,14 +306,16 @@ class ContentPreviewCard extends HookConsumerWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   // タイトル（2行分の高さを固定してサムネイルがずれないようにする）
                   SizedBox(
                     height: 36,
                     child: Text(
                       content.title,
-                      style: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                          color: isDark ? Colors.white : Colors.black),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -377,6 +392,7 @@ class ContentPreviewCard extends HookConsumerWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }
