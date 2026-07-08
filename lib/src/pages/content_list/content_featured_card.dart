@@ -19,11 +19,13 @@ class ContentFeaturedCard extends HookConsumerWidget {
     required this.content,
     required this.langCode,
     required this.isAvailable,
+    this.inline = false,
   });
 
   final PdfContent content;
   final String langCode;
   final bool isAvailable;
+  final bool inline;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -148,12 +150,207 @@ class ContentFeaturedCard extends HookConsumerWidget {
     final downloaded = isDownloaded.value;
     final path = savedPath.value;
 
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // 表紙画像の幅: 画面幅の 65%、最大 320px
+    // ── inline モード（Figma スタイル：白カード内に埋め込み） ──────────────
+    if (inline) {
+      const coverWidth = 153.0;
+      const coverHeight = 217.0;
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // セクションヘッダー
+            const Text(
+              '最新号を読む',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+
+            // 表紙画像（中央揃え）
+            Center(
+              child: SizedBox(
+                width: coverWidth,
+                height: coverHeight,
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.asset(
+                        'assets/skyward_cover.png',
+                        width: coverWidth,
+                        height: coverHeight,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, _, __) => Container(
+                          width: coverWidth,
+                          height: coverHeight,
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF2C2C2C)
+                                : const Color(0xFFF0F0F0),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(Icons.picture_as_pdf,
+                              size: 60,
+                              color: isDark
+                                  ? Colors.grey[600]
+                                  : Colors.grey[400]),
+                        ),
+                      ),
+                    ),
+                    if (isDownloading.value)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: ColoredBox(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          child: SizedBox(
+                            width: coverWidth,
+                            height: coverHeight,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 40,
+                                  height: 40,
+                                  child: CircularProgressIndicator(
+                                    value: progress.value > 0
+                                        ? progress.value
+                                        : null,
+                                    color: Colors.white,
+                                    strokeWidth: 3,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${(progress.value * 100).toStringAsFixed(0)}%',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            // タイトル
+            Text(
+              content.title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w300,
+                  color: isDark ? Colors.white : Colors.black),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ダウンロード / 開くボタン（全幅）
+            isDownloading.value
+                ? Column(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                            value: progress.value, minHeight: 6),
+                      ),
+                      const SizedBox(height: 6),
+                      TextButton.icon(
+                        onPressed: () {
+                          if (currentTaskId.value != null) {
+                            FileDownloader()
+                                .cancelTaskWithId(currentTaskId.value!);
+                          }
+                        },
+                        icon: const Icon(Icons.cancel,
+                            color: Colors.red, size: 16),
+                        label: Text(l10n.cancel,
+                            style: const TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  )
+                : ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFCC0000),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 48),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 10, horizontal: 24),
+                      textStyle: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600),
+                      shape: const StadiumBorder(),
+                      elevation: 0,
+                    ),
+                    onPressed: !isAvailable
+                        ? null
+                        : downloaded
+                            ? (path != null
+                                ? () => context.go('/viewer',
+                                    extra: ViewerArgs(
+                                        filePath: path,
+                                        preventCapture:
+                                            content.preventCapture))
+                                : null)
+                            : (dirSnapshot.hasData ? download : null),
+                    child: Text(!isAvailable
+                        ? l10n.contentUnavailableButton
+                        : downloaded
+                            ? l10n.open
+                            : '最新号をダウンロード'),
+                  ),
+
+            // バックナンバーリンク
+            if (!isDownloading.value) ...[
+              const SizedBox(height: 8),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF2A344B),
+                  minimumSize: const Size(double.infinity, 48),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 10, horizontal: 24),
+                  textStyle: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w600),
+                  shape: const StadiumBorder(
+                      side: BorderSide(color: Color(0xFFB7C1CD))),
+                  elevation: 0,
+                ),
+                onPressed: () => context.push('/backnumber'),
+                child: const Text('バックナンバーを読む'),
+              ),
+            ],
+
+            // 削除ボタン（ダウンロード済みのみ）
+            if (downloaded && !isDownloading.value)
+              Center(
+                child: TextButton.icon(
+                  onPressed: deleteFile,
+                  icon: Icon(Icons.delete_outline,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.error),
+                  label: Text(l10n.deleteFile,
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontSize: 12)),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    // ── standalone モード（従来スタイル：中央大型表示） ───────────────────
+    final body = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
             final coverWidth =
                 (MediaQuery.of(context).size.width * 0.65).clamp(0.0, 320.0);
             // A4縦比率 (1:√2)
@@ -205,7 +402,6 @@ class ContentFeaturedCard extends HookConsumerWidget {
                           ),
                         ),
                       ),
-                      // ダウンロード中オーバーレイ
                       if (isDownloading.value)
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
@@ -247,7 +443,6 @@ class ContentFeaturedCard extends HookConsumerWidget {
 
                 const SizedBox(height: 24),
 
-                // ── カテゴリーバッジ ──────────────────────────────────────────
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -264,7 +459,6 @@ class ContentFeaturedCard extends HookConsumerWidget {
 
                 const SizedBox(height: 12),
 
-                // ── タイトル ──────────────────────────────────────────────────
                 Text(
                   content.title,
                   textAlign: TextAlign.center,
@@ -274,7 +468,6 @@ class ContentFeaturedCard extends HookConsumerWidget {
 
                 const SizedBox(height: 8),
 
-                // ── 説明文 ────────────────────────────────────────────────────
                 Text(
                   content.description,
                   textAlign: TextAlign.center,
@@ -285,7 +478,6 @@ class ContentFeaturedCard extends HookConsumerWidget {
 
                 const SizedBox(height: 24),
 
-                // ── アクションボタン ──────────────────────────────────────────
                 SizedBox(
                   width: coverWidth,
                   child: isDownloading.value
@@ -337,7 +529,6 @@ class ContentFeaturedCard extends HookConsumerWidget {
                         ),
                 ),
 
-                // ダウンロード済みの場合は削除ボタンも表示
                 if (downloaded && !isDownloading.value) ...[
                   const SizedBox(height: 8),
                   TextButton.icon(
@@ -357,7 +548,7 @@ class ContentFeaturedCard extends HookConsumerWidget {
             );
           },
         ),
-      ),
     );
+    return Center(child: SingleChildScrollView(child: body));
   }
 }

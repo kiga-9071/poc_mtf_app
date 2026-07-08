@@ -42,6 +42,13 @@
       "url": "http://localhost:8765/image_sample_jp.pdf"
     },
     {
+      "id": "5",
+      "title": "TTS読み上げテスト",
+      "description": "日本語読み上げ機能の動作確認用PDF。標準CIDフォント（HeiseiKakuGo-W5）を使用（2ページ）。",
+      "category": "テスト",
+      "url": "http://localhost:8765/test_japanese_tts.pdf"
+    },
+    {
       "id": "99",
       "title": "大容量テストPDF（200MB）",
       "description": "バックグラウンドダウンロード検証用。1024x1024px の画像を67ページ埋め込んだ約200MBのファイル。",
