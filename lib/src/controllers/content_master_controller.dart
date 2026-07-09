@@ -3,6 +3,7 @@ import 'dart:io' show HttpDate;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -98,10 +99,29 @@ class ContentMasterNotifier extends StateNotifier<AsyncValue<ContentMaster>> {
         trustedTimeMs: trustedTime.millisecondsSinceEpoch,
         fetchedAtMs: now.millisecondsSinceEpoch,
       );
-    } catch (e, st) {
+    } catch (e) {
       debugPrint('[ContentMaster] server fetch error: $e');
+      // サーバーに接続できない場合は assets の contents.json を直接読み込む
+      await _loadFromBundle();
+    }
+  }
+
+  /// assets バンドルから直接 contents.json を読み込む。
+  /// サーバー未起動時（Android 起動直後など）のフォールバック。
+  Future<void> _loadFromBundle() async {
+    try {
+      final raw = await rootBundle.loadString(
+        'packages/mock_server/assets/contents.json',
+      );
+      final now = DateTime.now();
+      final master = _parse(raw, trustedTime: now, lastFetchedAt: now);
+      if (state is AsyncLoading || state is AsyncError) {
+        state = AsyncValue.data(master);
+      }
+      debugPrint('[ContentMaster] loaded from bundle (server unavailable)');
+    } catch (e, st) {
+      debugPrint('[ContentMaster] bundle load error: $e');
       if (state is AsyncLoading) state = AsyncValue.error(e, st);
-      // キャッシュが既にある場合はサイレント失敗（既存データを維持）
     }
   }
 

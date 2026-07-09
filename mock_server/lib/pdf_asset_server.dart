@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 
@@ -19,15 +19,32 @@ class PdfAssetServer {
   Future<void> start(Map<String, Uint8List> pdfCache) async {
     if (_server != null) return;
 
-    try {
-      _server = await io.serve(
-        _handler(pdfCache),
-        InternetAddress.loopbackIPv4,
-        port,
-        shared: true,
-      );
-    } on SocketException catch (e) {
-      stderr.writeln('PdfAssetServer: port $port bind failed: $e');
+    // 前回プロセスが port を保持したまま終了している場合（EADDRINUSE）を考慮して
+    // 最大 3 回・500ms 間隔でリトライする。
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        _server = await io.serve(
+          _handler(pdfCache),
+          InternetAddress.loopbackIPv4,
+          port,
+          shared: true,
+        );
+        debugPrint('PdfAssetServer: listening on 127.0.0.1:$port');
+        return;
+      } on SocketException catch (e) {
+        if (e.osError?.errorCode == 98 && attempt < 2) {
+          debugPrint(
+            'PdfAssetServer: port $port busy (attempt ${attempt + 1}), retrying...',
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+        } else {
+          debugPrint('PdfAssetServer: port $port bind failed: $e');
+          return;
+        }
+      } catch (e) {
+        debugPrint('PdfAssetServer: port $port bind failed: $e');
+        return;
+      }
     }
   }
 

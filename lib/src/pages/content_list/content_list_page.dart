@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +13,8 @@ import '../../controllers/theme_controller.dart';
 import '../../l10n.dart';
 import 'content_featured_card.dart';
 import 'content_preview_card.dart';
+import 'shop_tab.dart';
+import 'youtube_tab.dart';
 
 // ── ストレージ初期化（テスト用） ────────────────────────────────────────────
 
@@ -152,12 +155,57 @@ Future<void> showLanguageDialog(BuildContext context, WidgetRef ref) {
 class ContentListPage extends HookConsumerWidget {
   const ContentListPage({super.key});
 
+  static Widget _buildFilterRow(
+    List<(String, double)> items,
+    ValueNotifier<String?> selectedTag,
+    Color primary,
+  ) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: items.asMap().entries.map((entry) {
+        final (tag, width) = entry.value;
+        final isLast = entry.key == items.length - 1;
+        final isSelected = selectedTag.value == tag;
+        return Padding(
+          padding: EdgeInsets.only(right: isLast ? 0 : 8),
+          child: GestureDetector(
+            onTap: () => selectedTag.value = isSelected ? null : tag,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: width,
+              height: 48,
+              decoration: BoxDecoration(
+                color: isSelected ? primary : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: isSelected ? primary : const Color(0xFFB7C1CD),
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  tag,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: isSelected ? Colors.white : const Color(0xFF2A344B),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   static Widget _buildStaticArticleCard({
+    required BuildContext context,
     required String imagePath,
     required String tag,
     required String title,
+    String? url,
   }) {
-    return DecoratedBox(
+    final card = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
         boxShadow: const [
@@ -218,6 +266,11 @@ class ContentListPage extends HookConsumerWidget {
         ),
       ),
     );
+    if (url == null) return card;
+    return GestureDetector(
+      onTap: () => context.push('/webview', extra: url),
+      child: card,
+    );
   }
 
   @override
@@ -227,7 +280,8 @@ class ContentListPage extends HookConsumerWidget {
     final l10n = AppL10n.of(context);
     final masterAsync = ref.watch(contentMasterProvider);
     final reloadKey = useState(0);
-    final selectedTag = useState<String?>(null);
+    final selectedTag = useState<String?>('旅・文化');
+    final scrollController = useScrollController();
 
     final lifecycle = useAppLifecycleState();
     useEffect(() {
@@ -325,13 +379,17 @@ class ContentListPage extends HookConsumerWidget {
                         c.category != 'In-flight Magazine')
                     .toList();
 
-                const categories = ['日本の旅', '海外の旅', 'グルメ', 'エンタメ'];
+                const categories = [
+                  ('旅・文化', 108.0),
+                  ('グルメ・お土産', 152.0),
+                  ('物語', 78.0),
+                  ('エンタメ', 108.0),
+                  ('JAL Stories', 141.0),
+                ];
 
-                final filtered = selectedTag.value == null
-                    ? others
-                    : others
-                        .where((c) => c.category == selectedTag.value)
-                        .toList();
+                final filtered = others
+                    .where((c) => c.category == selectedTag.value)
+                    .toList();
 
                 final isDark =
                     Theme.of(context).brightness == Brightness.dark;
@@ -359,6 +417,7 @@ class ContentListPage extends HookConsumerWidget {
                         ),
                       ),
                       ListView(
+                    controller: scrollController,
                     padding: EdgeInsets.zero,
                     children: [
                       // ── フィーチャー白カード（ヘッダーを内包） ────────
@@ -366,110 +425,82 @@ class ContentListPage extends HookConsumerWidget {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
                           child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x1A2A344B),
-                                  blurRadius: 10,
-                                  spreadRadius: -2,
-                                  offset: Offset(0, 5),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x1A2A344B),
+                                    blurRadius: 10,
+                                    spreadRadius: -2,
+                                    offset: Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: Card(
+                                color: cardColor,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
+                                clipBehavior: Clip.antiAlias,
+                                child: ContentFeaturedCard(
+                                  key: ValueKey(
+                                      'featured_${reloadKey.value}'),
+                                  content: featured,
+                                  langCode: locale.languageCode,
+                                  isAvailable: featured.isAvailableAt(now),
+                                  inline: true,
                                 ),
-                              ],
+                              ),
                             ),
-                            child: Card(
-                              color: cardColor,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              clipBehavior: Clip.antiAlias,
-                              child: ContentFeaturedCard(
-                              key: ValueKey(
-                                  'featured_${reloadKey.value}'),
-                              content: featured,
-                              langCode: locale.languageCode,
-                              isAvailable: featured.isAvailableAt(now),
-                              inline: true,
-                            ),
-                          ),
-                        ),
                         ),
 
-                      const SizedBox(height: 48),
+                      const SizedBox(height: 32),
 
-                      // ── カテゴリフィルタータグ ────────────────────────
-                      if (categories.isNotEmpty)
-                        Center(
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            child: Stack(
-                              children: [
-                                // ボタン行（clip で外形を切り抜く）
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(24),
-                                  child: Container(
-                                    height: 48,
-                                    color: isDark
-                                        ? const Color(0xFF3A3A3C)
-                                        : Colors.transparent,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: categories.map((tag) {
-                                        final isSelected =
-                                            selectedTag.value == tag;
-                                        return GestureDetector(
-                                          onTap: () => selectedTag.value =
-                                              isSelected ? null : tag,
-                                          child: AnimatedContainer(
-                                            duration: const Duration(
-                                                milliseconds: 150),
-                                            height: 48,
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 20),
-                                            decoration: BoxDecoration(
-                                              color: isSelected
-                                                  ? primary
-                                                  : Colors.transparent,
-                                              borderRadius:
-                                                  BorderRadius.circular(24),
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                tag,
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: isSelected
-                                                      ? Colors.white
-                                                      : const Color(0xFF2A344B),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ),
-                                ),
-                                // 外枠をオーバーレイで描画（塗りつぶしとの隙間なし）
-                                Positioned.fill(
-                                  child: IgnorePointer(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius:
-                                            BorderRadius.circular(24),
-                                        border: Border.all(
-                                            color: const Color(0xFFB7C1CD)),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                      // ── Pick UP セクション ────────────────────────────
+                      const Padding(
+                        padding: EdgeInsets.only(left: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Pick UP',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
                             ),
-                          ),
+                            SizedBox(height: 8),
+                            Text(
+                              '人気記事をピックアップ',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w300,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ── カテゴリフィルタータグ（2行独立ボタン） ────────
+                      Column(
+                        children: [
+                          _buildFilterRow(
+                            categories.sublist(0, 2),
+                            selectedTag,
+                            primary,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildFilterRow(
+                            categories.sublist(2),
+                            selectedTag,
+                            primary,
+                          ),
+                        ],
+                      ),
 
                       const SizedBox(height: 32),
 
@@ -477,7 +508,7 @@ class ContentListPage extends HookConsumerWidget {
                       Padding(
                         padding:
                             const EdgeInsets.symmetric(horizontal: 24),
-                        child: selectedTag.value == '日本の旅'
+                        child: selectedTag.value == '旅・文化'
                             ? GridView.count(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
@@ -487,58 +518,71 @@ class ContentListPage extends HookConsumerWidget {
                                 childAspectRatio: 163 / 258,
                                 children: [
                                   _buildStaticArticleCard(
+                                    context: context,
                                     imagePath: 'assets/kochi_katsuo.jpg',
                                     tag: '高知',
                                     title: '初夏、かつおを食べに',
+                                    url: 'https://skywardplus.jal.co.jp/plus_one/other/sightseeing_toyama/',
                                   ),
                                   _buildStaticArticleCard(
+                                    context: context,
                                     imagePath: 'assets/local_chain_ramen.jpg',
                                     tag: 'グルメ',
                                     title: '噂のローカルチェーン飯',
+                                    url: 'https://skywardplus.jal.co.jp/plus_one/other/sightseeing_kumamoto/',
                                   ),
                                   _buildStaticArticleCard(
+                                    context: context,
                                     imagePath: 'assets/sora_gourmet_aomori.jpg',
                                     tag: '青森',
                                     title: '食べたい！買いたい！空グルメ！',
+                                    url: 'https://skywardplus.jal.co.jp/gourmet/crew/soysoy_cafe/',
                                   ),
                                   _buildStaticArticleCard(
+                                    context: context,
                                     imagePath: 'assets/ichiro_malt.jpg',
                                     tag: '秩父',
                                     title: 'イッピンに宿る物語',
+                                    url: 'https://skywardplus.jal.co.jp/view/crew/nihondaira_yume_terrace/',
                                   ),
                                   _buildStaticArticleCard(
+                                    context: context,
                                     imagePath: 'assets/minami_aso.jpg',
                                     tag: '熊本',
                                     title: '南阿蘇　五岳五湯御めぐり',
                                   ),
                                   _buildStaticArticleCard(
+                                    context: context,
                                     imagePath: 'assets/sora_gourmet_memanbetsu.jpg',
                                     tag: '北海道',
                                     title: '食べたい！買いたい！空グルメ！',
                                   ),
                                 ],
                               )
-                            : GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: 16,
-                                  mainAxisSpacing: 16,
-                                  mainAxisExtent: 260,
-                                ),
-                                itemCount: filtered.length,
-                                itemBuilder: (context, index) =>
-                                    ContentPreviewCard(
-                                  key: ValueKey(
-                                      '${reloadKey.value}_$index'),
-                                  content: filtered[index],
-                                  langCode: locale.languageCode,
-                                  isAvailable:
-                                      filtered[index].isAvailableAt(now),
-                                ),
-                              ),
+                            : selectedTag.value == null
+                                ? const SizedBox.shrink()
+                                : GridView.builder(
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    gridDelegate:
+                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: 16,
+                                      mainAxisSpacing: 16,
+                                      mainAxisExtent: 260,
+                                    ),
+                                    itemCount: filtered.length,
+                                    itemBuilder: (context, index) =>
+                                        ContentPreviewCard(
+                                      key: ValueKey(
+                                          '${reloadKey.value}_$index'),
+                                      content: filtered[index],
+                                      langCode: locale.languageCode,
+                                      isAvailable:
+                                          filtered[index].isAvailableAt(now),
+                                    ),
+                                  ),
                       ),
 
                       const SizedBox(height: 24),
@@ -551,36 +595,10 @@ class ContentListPage extends HookConsumerWidget {
             ),
 
             // ── JAL SHOPタブ ──────────────────────────────────────────────
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.shopping_bag_outlined,
-                      size: 64, color: Theme.of(context).disabledColor),
-                  const SizedBox(height: 16),
-                  Text(l10n.comingSoon,
-                      style: TextStyle(
-                          fontSize: 18,
-                          color: Theme.of(context).disabledColor)),
-                ],
-              ),
-            ),
+            const ShopTab(),
 
             // ── Youtubeタブ ───────────────────────────────────────────────
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.smart_display_outlined,
-                      size: 64, color: Theme.of(context).disabledColor),
-                  const SizedBox(height: 16),
-                  Text(l10n.comingSoon,
-                      style: TextStyle(
-                          fontSize: 18,
-                          color: Theme.of(context).disabledColor)),
-                ],
-              ),
-            ),
+            const YoutubeTab(),
           ],
         ),
       ),

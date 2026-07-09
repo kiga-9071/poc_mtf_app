@@ -1,7 +1,8 @@
 import 'dart:io';
 
-import 'package:background_downloader/background_downloader.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -36,10 +37,9 @@ class ContentListCard extends HookConsumerWidget {
 
     final isDownloading = useState(false);
     final progress = useState(0.0);
-    // ダウンロードごとに新しいトークンを生成するため ValueNotifier で保持する。
-    // useMemoized では一度キャンセルしたトークンが使い回されてサイレント失敗するため使わない。
-    final currentTaskId = useState<String?>(null);
+    final cancelToken = useState<CancelToken?>(null);
     final isDownloaded = useState(false);
+    final dio = useMemoized(() => Dio(BaseOptions(connectTimeout: const Duration(seconds: 3))));
     final savedPath = useState<String?>(null);
     final fileSize = useState<int?>(null);
 
@@ -71,49 +71,59 @@ class ContentListCard extends HookConsumerWidget {
       isDownloading.value = true;
       progress.value = 0;
 
-      // background_downloader でバックグラウンドダウンロード
-      final taskId = '${content.id}_$langCode';
-      currentTaskId.value = taskId;
+      final token = CancelToken();
+      cancelToken.value = token;
       try {
-        final result = await FileDownloader().download(
-          DownloadTask(
-            taskId: taskId,
-            url: Uri.encodeFull(content.url),
-            filename: path.split('/').last,
-            directory: '',
-            baseDirectory: BaseDirectory.applicationDocuments,
-            updates: Updates.statusAndProgress,
-          ),
-          onProgress: (prog) {
+        await dio.download(
+          Uri.encodeFull(content.url),
+          path,
+          cancelToken: token,
+          onReceiveProgress: (received, total) {
             if (!context.mounted) return;
-            progress.value = prog;
+            if (total > 0) progress.value = received / total;
           },
         );
         if (!context.mounted) return;
-        currentTaskId.value = null;
-        switch (result.status) {
-          case TaskStatus.complete:
-            isDownloading.value = false;
-            if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
-            context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
-          case TaskStatus.canceled:
-            isDownloading.value = false;
-            progress.value = 0;
-          default:
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l10n.downloadFailed(result.exception?.description ?? ''))),
-            );
-            isDownloading.value = false;
-            progress.value = 0;
+        cancelToken.value = null;
+        isDownloading.value = false;
+        if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
+        context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
+      } on DioException catch (e) {
+        if (!context.mounted) return;
+        cancelToken.value = null;
+        if (e.type == DioExceptionType.cancel) {
+          isDownloading.value = false;
+          progress.value = 0;
+          return;
+        }
+        try {
+          final filename = content.url.split('/').last;
+          final assetData = await rootBundle.load(
+            'packages/mock_server/assets/pdfs/$filename',
+          );
+          if (!context.mounted) return;
+          await File(path).writeAsBytes(assetData.buffer.asUint8List());
+          if (!context.mounted) return;
+          isDownloading.value = false;
+          progress.value = 1.0;
+          if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
+          context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
+        } catch (fallbackErr) {
+          if (!context.mounted) return;
+          isDownloading.value = false;
+          progress.value = 0;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.downloadFailed('$fallbackErr'))),
+          );
         }
       } catch (e) {
         if (!context.mounted) return;
-        currentTaskId.value = null;
+        cancelToken.value = null;
+        isDownloading.value = false;
+        progress.value = 0;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.errorMsg('$e'))),
         );
-        isDownloading.value = false;
-        progress.value = 0;
       }
     }
 
@@ -259,11 +269,7 @@ class ContentListCard extends HookConsumerWidget {
                     style: const TextStyle(fontSize: 12),
                   ),
                   TextButton(
-                    onPressed: () {
-                      if (currentTaskId.value != null) {
-                        FileDownloader().cancelTaskWithId(currentTaskId.value!);
-                      }
-                    },
+                    onPressed: () => cancelToken.value?.cancel(),
                     child: Text(l10n.cancel,
                         style: const TextStyle(fontSize: 12)),
                   ),
