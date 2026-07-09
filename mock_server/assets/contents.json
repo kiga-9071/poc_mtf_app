@@ -5,7 +5,7 @@
       "title": "SKYWARD 2026年5月号",
       "description": "メルボルンとっておきの場所とびっきりの一杯",
       "category": "機内誌",
-      "url": "http://localhost:8765/SKYWARD 2026年5月号.pdf",
+      "url": "http://127.0.0.1:8765/skyward_2026_05.pdf",
       "availableFrom": "2026-04-01T00:00:00+09:00",
       "availableTo": "2026-12-31T23:59:59+09:00",
       "preventCapture": true
@@ -15,14 +15,14 @@
       "title": "DX入門ガイド",
       "description": "デジタルトランスフォーメーションの基礎から実践まで解説。目次・内部リンク付き（8ページ）。",
       "category": "ビジネス",
-      "url": "http://localhost:8765/dx_guide_jp.pdf"
+      "url": "http://127.0.0.1:8765/dx_guide_jp.pdf"
     },
     {
       "id": "2",
       "title": "AI技術と社会の未来 2024年版",
       "description": "生成AI・産業影響・倫理規制・今後の展望を網羅したレポート。目次・外部リンク付き（9ページ）。",
       "category": "テクノロジー",
-      "url": "http://localhost:8765/ai_society_report.pdf",
+      "url": "http://127.0.0.1:8765/ai_society_report.pdf",
       "availableFrom": "2024-01-01T00:00:00+09:00",
       "availableTo": "2025-12-31T23:59:59+09:00",
       "preventCapture": true
@@ -32,28 +32,28 @@
       "title": "テキスト形式サンプル",
       "description": "文字データを直接保持するテキスト形式PDF。検索・選択・コピー動作の確認用（4ページ）。",
       "category": "テスト",
-      "url": "http://localhost:8765/text_sample_jp.pdf"
+      "url": "http://127.0.0.1:8765/text_sample_jp.pdf"
     },
     {
       "id": "4",
       "title": "画像形式サンプル",
       "description": "図形・棒グラフ・円グラフ・アイコンカードで構成されたビジュアルPDF。検索・選択は不可（4ページ）。",
       "category": "テスト",
-      "url": "http://localhost:8765/image_sample_jp.pdf"
+      "url": "http://127.0.0.1:8765/image_sample_jp.pdf"
     },
     {
       "id": "5",
       "title": "TTS読み上げテスト",
       "description": "日本語読み上げ機能の動作確認用PDF。標準CIDフォント（HeiseiKakuGo-W5）を使用（2ページ）。",
       "category": "テスト",
-      "url": "http://localhost:8765/test_japanese_tts.pdf"
+      "url": "http://127.0.0.1:8765/test_japanese_tts.pdf"
     },
     {
       "id": "99",
       "title": "大容量テストPDF（200MB）",
       "description": "バックグラウンドダウンロード検証用。1024x1024px の画像を67ページ埋め込んだ約200MBのファイル。",
       "category": "テスト",
-      "url": "http://localhost:8765/large_test.pdf",
+      "url": "http://127.0.0.1:8765/large_test.pdf",
       "availableFrom": "2027-01-01T00:00:00+09:00"
     }
   ],
@@ -63,7 +63,7 @@
       "title": "SKYWARD May 2026",
       "description": "Melbourne's favorite spots and finest drinks",
       "category": "In-flight Magazine",
-      "url": "http://localhost:8765/SKYWARD 2026年5月号.pdf",
+      "url": "http://127.0.0.1:8765/skyward_2026_05.pdf",
       "availableFrom": "2026-04-01T00:00:00+09:00",
       "availableTo": "2026-12-31T23:59:59+09:00",
       "preventCapture": true
@@ -73,14 +73,14 @@
       "title": "DX Beginner's Guide",
       "description": "A comprehensive introduction to Digital Transformation — from basics to practice. With TOC and internal links (8 pages).",
       "category": "Business",
-      "url": "http://localhost:8765/dx_guide_en.pdf"
+      "url": "http://127.0.0.1:8765/dx_guide_en.pdf"
     },
     {
       "id": "2",
       "title": "AI Technology and Society 2024",
       "description": "Covers Generative AI, industrial impact, ethics, and future outlook. With TOC and external links (7 pages).",
       "category": "Technology",
-      "url": "http://localhost:8765/ai_society_en.pdf",
+      "url": "http://127.0.0.1:8765/ai_society_en.pdf",
       "availableFrom": "2024-01-01T00:00:00+09:00",
       "availableTo": "2025-12-31T23:59:59+09:00",
       "preventCapture": true
@@ -90,21 +90,21 @@
       "title": "Text Format Sample",
       "description": "A text-based PDF with embedded character data. Use to verify search, selection, and copy features (4 pages).",
       "category": "Test",
-      "url": "http://localhost:8765/text_sample_en.pdf"
+      "url": "http://127.0.0.1:8765/text_sample_en.pdf"
     },
     {
       "id": "4",
       "title": "Image Format Sample",
       "description": "A visual PDF composed of shapes, bar charts, pie charts, and icon cards. No text search or selection (4 pages).",
       "category": "Test",
-      "url": "http://localhost:8765/image_sample_en.pdf"
+      "url": "http://127.0.0.1:8765/image_sample_en.pdf"
     },
     {
       "id": "99",
       "title": "Large File Test PDF (200MB)",
       "description": "For background download verification. 67 pages with embedded 1024x1024px images, approx. 200MB total.",
       "category": "Test",
-      "url": "http://localhost:8765/large_test.pdf",
+      "url": "http://127.0.0.1:8765/large_test.pdf",
       "availableFrom": "2027-01-01T00:00:00+09:00"
     }
   ]
