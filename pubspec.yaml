@@ -42,9 +42,6 @@ dependencies:
   # WebView
   flutter_inappwebview: ^6.1.5
 
-  # YouTube プレーヤー
-  youtube_player_flutter: ^9.1.1
-
   # テキスト認識・読み上げ
   google_mlkit_text_recognition: ^0.13.0
   flutter_tts: ^4.2.0
@@ -81,6 +78,17 @@ flutter:
     - assets/ichiro_malt.jpg
     - assets/minami_aso.jpg
     - assets/sora_gourmet_memanbetsu.jpg
+    - assets/shop_single.png
+    - assets/shop_lohme.png
+    - assets/shop_famillea.png
+    - assets/shop_toystory.png
+    - assets/shop_unagi.jpg
+    - assets/shop_iphone.jpg
+    - assets/shop_curry.jpg
+    - assets/shop_skytime.jpg
+    - assets/pickup_carlease.jpg
+    - assets/pickup_okamoto_sanbashi.jpg
+    - assets/jalshop_catalog.png
 
 flutter_launcher_icons:
   android: true

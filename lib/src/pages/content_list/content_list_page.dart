@@ -160,41 +160,45 @@ class ContentListPage extends HookConsumerWidget {
     ValueNotifier<String?> selectedTag,
     Color primary,
   ) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: items.asMap().entries.map((entry) {
-        final (tag, width) = entry.value;
-        final isLast = entry.key == items.length - 1;
-        final isSelected = selectedTag.value == tag;
-        return Padding(
-          padding: EdgeInsets.only(right: isLast ? 0 : 8),
-          child: GestureDetector(
-            onTap: () => selectedTag.value = isSelected ? null : tag,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: width,
-              height: 48,
-              decoration: BoxDecoration(
-                color: isSelected ? primary : Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isSelected ? primary : const Color(0xFFB7C1CD),
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: items.asMap().entries.map((entry) {
+          final (tag, width) = entry.value;
+          final isLast = entry.key == items.length - 1;
+          final isSelected = selectedTag.value == tag;
+          return Padding(
+            padding: EdgeInsets.only(right: isLast ? 0 : 8),
+            child: GestureDetector(
+              onTap: () => selectedTag.value = isSelected ? null : tag,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: width,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isSelected ? primary : Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: isSelected ? primary : const Color(0xFFB7C1CD),
+                  ),
                 ),
-              ),
-              child: Center(
-                child: Text(
-                  tag,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: isSelected ? Colors.white : const Color(0xFF2A344B),
+                child: Center(
+                  child: Text(
+                    tag,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color:
+                          isSelected ? Colors.white : const Color(0xFF2A344B),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        );
-      }).toList(),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -307,7 +311,12 @@ class ContentListPage extends HookConsumerWidget {
             tabs: [
               Tab(text: 'SKYWARD'),
               Tab(text: 'JAL SHOP'),
-              Tab(text: 'Youtube【公式】'),
+              Tab(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text('Youtube【公式】'),
+                ),
+              ),
             ],
             indicatorColor: Color(0xFFCC0000),
             indicatorSize: TabBarIndicatorSize.tab,
@@ -547,15 +556,17 @@ class ContentListPage extends HookConsumerWidget {
                                   ),
                                   _buildStaticArticleCard(
                                     context: context,
-                                    imagePath: 'assets/minami_aso.jpg',
-                                    tag: '熊本',
-                                    title: '南阿蘇　五岳五湯御めぐり',
+                                    imagePath: 'assets/pickup_carlease.jpg',
+                                    tag: 'カーリース',
+                                    title: '【2026年6月最新】カーリースおすすめ12社を比較して紹介！',
+                                    url: 'https://skywardplus.jal.co.jp/plus_one/solution/car_lease/recommend/',
                                   ),
                                   _buildStaticArticleCard(
                                     context: context,
-                                    imagePath: 'assets/sora_gourmet_memanbetsu.jpg',
-                                    tag: '北海道',
-                                    title: '食べたい！買いたい！空グルメ！',
+                                    imagePath: 'assets/pickup_okamoto_sanbashi.jpg',
+                                    tag: '千葉',
+                                    title: '岡本桟橋（原岡桟橋）徹底ガイド｜絶景の夕日と富士山、アクセス情報まとめ',
+                                    url: 'https://skywardplus.jal.co.jp/hanto/plus_one/okamoto-sanbashi/',
                                   ),
                                 ],
                               )
@@ -566,11 +577,11 @@ class ContentListPage extends HookConsumerWidget {
                                     physics:
                                         const NeverScrollableScrollPhysics(),
                                     gridDelegate:
-                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                        SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: 2,
                                       crossAxisSpacing: 16,
                                       mainAxisSpacing: 16,
-                                      mainAxisExtent: 260,
+                                      mainAxisExtent: MediaQuery.of(context).size.height < 700 ? 240.0 : 260.0,
                                     ),
                                     itemCount: filtered.length,
                                     itemBuilder: (context, index) =>

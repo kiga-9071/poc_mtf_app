@@ -1,9 +1,11 @@
 import 'dart:io';
 
+import 'package:background_downloader/background_downloader.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -46,7 +48,10 @@ class ContentPreviewCard extends HookConsumerWidget {
     final isDownloading = useState(false);
     // ダウンロード進捗（0.0 〜 1.0）
     final progress = useState(0.0);
+    // ローカル（dio）用キャンセルトークン
     final cancelToken = useState<CancelToken?>(null);
+    // 外部URL（background_downloader）用タスク
+    final currentBgTask = useState<DownloadTask?>(null);
     final isDownloaded = useState(false);
     final dio = useMemoized(() => Dio(BaseOptions(connectTimeout: const Duration(seconds: 3))));
     // 保存済みファイルのローカルパス（サムネイル表示に使用）
@@ -78,59 +83,102 @@ class ContentPreviewCard extends HookConsumerWidget {
       isDownloading.value = true;
       progress.value = 0;
 
-      final token = CancelToken();
-      cancelToken.value = token;
-      try {
-        await dio.download(
-          Uri.encodeFull(content.url),
-          path,
-          cancelToken: token,
-          onReceiveProgress: (received, total) {
-            if (!context.mounted) return;
-            if (total > 0) progress.value = received / total;
-          },
-        );
-        if (!context.mounted) return;
-        cancelToken.value = null;
-        isDownloading.value = false;
-        if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
-        context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
-      } on DioException catch (e) {
-        if (!context.mounted) return;
-        cancelToken.value = null;
-        if (e.type == DioExceptionType.cancel) {
-          isDownloading.value = false;
-          progress.value = 0;
-          return;
-        }
+      final isLocal = content.url.startsWith('http://127.0.0.1');
+
+      if (isLocal) {
+        // ── ローカル（モックサーバー）: dio でダウンロード ─────────────────
+        final token = CancelToken();
+        cancelToken.value = token;
         try {
-          final filename = content.url.split('/').last;
-          final assetData = await rootBundle.load(
-            'packages/mock_server/assets/pdfs/$filename',
+          await dio.download(
+            Uri.encodeFull(content.url),
+            path,
+            cancelToken: token,
+            onReceiveProgress: (received, total) {
+              if (!context.mounted) return;
+              if (total > 0) progress.value = received / total;
+            },
           );
           if (!context.mounted) return;
-          await File(path).writeAsBytes(assetData.buffer.asUint8List());
-          if (!context.mounted) return;
+          cancelToken.value = null;
           isDownloading.value = false;
-          progress.value = 1.0;
           if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
           context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
-        } catch (fallbackErr) {
+        } on DioException catch (e) {
           if (!context.mounted) return;
+          cancelToken.value = null;
+          if (e.type == DioExceptionType.cancel) {
+            isDownloading.value = false;
+            progress.value = 0;
+            return;
+          }
+          // サーバー接続失敗時はバンドルアセットにフォールバック
+          try {
+            final filename = content.url.split('/').last;
+            final assetData = await rootBundle.load(
+              'packages/mock_server/assets/pdfs/$filename',
+            );
+            if (!context.mounted) return;
+            await File(path).writeAsBytes(assetData.buffer.asUint8List());
+            if (!context.mounted) return;
+            isDownloading.value = false;
+            progress.value = 1.0;
+            if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
+            context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
+          } catch (fallbackErr) {
+            if (!context.mounted) return;
+            isDownloading.value = false;
+            progress.value = 0;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.downloadFailed('$fallbackErr'))),
+            );
+          }
+        } catch (e) {
+          if (!context.mounted) return;
+          cancelToken.value = null;
           isDownloading.value = false;
           progress.value = 0;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.downloadFailed('$fallbackErr'))),
+            SnackBar(content: Text(l10n.errorMsg('$e'))),
           );
         }
-      } catch (e) {
-        if (!context.mounted) return;
-        cancelToken.value = null;
-        isDownloading.value = false;
-        progress.value = 0;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.errorMsg('$e'))),
+      } else {
+        // ── 外部URL: background_downloader でダウンロード ────────────────
+        // buildSavePath と同じファイル名・同じ保存先ディレクトリを使用する。
+        final filename = path.split('/').last;
+        final task = DownloadTask(
+          url: content.url,
+          filename: filename,
+          baseDirectory: BaseDirectory.applicationDocuments,
+          updates: Updates.statusAndProgress,
         );
+        currentBgTask.value = task;
+
+        final result = await FileDownloader().download(
+          task,
+          onProgress: (p) {
+            if (context.mounted) progress.value = p.clamp(0.0, 1.0);
+          },
+        );
+
+        currentBgTask.value = null;
+        if (!context.mounted) return;
+
+        switch (result.status) {
+          case TaskStatus.complete:
+            isDownloading.value = false;
+            if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
+            context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
+          case TaskStatus.canceled:
+            isDownloading.value = false;
+            progress.value = 0;
+          default:
+            isDownloading.value = false;
+            progress.value = 0;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.downloadFailed('${result.status}'))),
+            );
+        }
       }
     }
 
@@ -200,6 +248,9 @@ class ContentPreviewCard extends HookConsumerWidget {
                 Image.asset(
                   content.previewImageAsset,
                   fit: BoxFit.cover,
+                  alignment: content.isWebContent
+                      ? Alignment.topCenter
+                      : Alignment.center,
                   errorBuilder: (ctx, _, __) => ColoredBox(
                     color: isDark
                         ? const Color(0xFF2C2C2C)
@@ -244,7 +295,7 @@ class ContentPreviewCard extends HookConsumerWidget {
 
           // ── 情報領域（高さ固定でサムネイル高さを安定させる） ───────────────
           SizedBox(
-            height: 114,
+            height: 122,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
               child: Column(
@@ -320,7 +371,7 @@ class ContentPreviewCard extends HookConsumerWidget {
                   const SizedBox(height: 8),
                   // タイトル（2行分の高さを固定してサムネイルがずれないようにする）
                   SizedBox(
-                    height: 36,
+                    height: 42,
                     child: Text(
                       content.title,
                       style: TextStyle(
@@ -337,59 +388,92 @@ class ContentPreviewCard extends HookConsumerWidget {
                       alignment: Alignment.center,
                       child: SizedBox(
                         width: double.infinity,
-                        child: isDownloading.value
-                            // ダウンロード中: プログレスバー + キャンセルボタン
-                            ? Row(
-                                children: [
-                                  Expanded(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(4),
-                                      child: LinearProgressIndicator(
-                                        value: progress.value,
-                                        minHeight: 6,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  GestureDetector(
-                                    onTap: () => cancelToken.value?.cancel(),
-                                    child: Icon(Icons.cancel,
-                                        size: 20,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .error),
-                                  ),
-                                ],
-                              )
-                            : ElevatedButton(
+                        child: content.isWebContent
+                            // Webコンテンツ: ChromeSafariBrowser で開く
+                            ? ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 4),
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
                                   minimumSize: const Size(0, 28),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   textStyle: const TextStyle(fontSize: 11),
                                 ),
                                 onPressed: !isAvailable
                                     ? null
-                                    : downloaded
-                                        ? (path != null
-                                            ? () => context.go('/viewer',
-                                                extra: ViewerArgs(
-                                                    filePath: path,
-                                                    preventCapture: content
-                                                        .preventCapture))
-                                            : null)
-                                        : (dirSnapshot.hasData ? download : null),
+                                    : () async {
+                                        final browser = ChromeSafariBrowser();
+                                        await browser.open(
+                                          url: WebUri(content.url),
+                                          settings: ChromeSafariBrowserSettings(
+                                            presentationStyle:
+                                                ModalPresentationStyle.FULL_SCREEN,
+                                            barCollapsingEnabled: true,
+                                          ),
+                                        );
+                                      },
                                 child: FittedBox(
                                   fit: BoxFit.scaleDown,
                                   child: Text(!isAvailable
                                       ? l10n.contentUnavailableButton
-                                      : downloaded
-                                          ? l10n.open
-                                          : l10n.downloadAndSave),
+                                      : l10n.openOnWeb),
                                 ),
-                              ),
+                              )
+                            : isDownloading.value
+                                // ダウンロード中: プログレスバー + キャンセルボタン
+                                ? Row(
+                                    children: [
+                                      Expanded(
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(4),
+                                          child: LinearProgressIndicator(
+                                            value: progress.value,
+                                            minHeight: 6,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      GestureDetector(
+                                        onTap: () {
+                                          cancelToken.value?.cancel();
+                                          final bgTask = currentBgTask.value;
+                                          if (bgTask != null) {
+                                            FileDownloader().cancel(bgTask);
+                                          }
+                                        },
+                                        child: Icon(Icons.cancel,
+                                            size: 20,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .error),
+                                      ),
+                                    ],
+                                  )
+                                : ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 4),
+                                      minimumSize: const Size(0, 28),
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      textStyle: const TextStyle(fontSize: 11),
+                                    ),
+                                    onPressed: !isAvailable
+                                        ? null
+                                        : downloaded
+                                            ? (path != null
+                                                ? () => context.go('/viewer',
+                                                    extra: ViewerArgs(
+                                                        filePath: path,
+                                                        preventCapture: content
+                                                            .preventCapture))
+                                                : null)
+                                            : (dirSnapshot.hasData ? download : null),
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(!isAvailable
+                                          ? l10n.contentUnavailableButton
+                                          : downloaded
+                                              ? l10n.open
+                                              : l10n.downloadAndSave),
+                                    ),
+                                  ),
                       ),
                     ),
                   ),

@@ -263,6 +263,8 @@ class ContentFeaturedCard extends HookConsumerWidget {
                   fontSize: 18,
                   fontWeight: FontWeight.w300,
                   color: isDark ? Colors.white : Colors.black),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
 
             const SizedBox(height: 16),
@@ -311,11 +313,14 @@ class ContentFeaturedCard extends HookConsumerWidget {
                                             content.preventCapture))
                                 : null)
                             : (dirSnapshot.hasData ? download : null),
-                    child: Text(!isAvailable
-                        ? l10n.contentUnavailableButton
-                        : downloaded
-                            ? l10n.open
-                            : '最新号をダウンロード'),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(!isAvailable
+                          ? l10n.contentUnavailableButton
+                          : downloaded
+                              ? l10n.open
+                              : '最新号をダウンロード'),
+                    ),
                   ),
 
             // バックナンバーリンク
@@ -476,6 +481,8 @@ class ContentFeaturedCard extends HookConsumerWidget {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       fontSize: 22, fontWeight: FontWeight.bold),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
 
                 const SizedBox(height: 8),
@@ -486,6 +493,8 @@ class ContentFeaturedCard extends HookConsumerWidget {
                   style: TextStyle(
                       fontSize: 14,
                       color: isDark ? Colors.white70 : Colors.black54),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
 
                 const SizedBox(height: 24),

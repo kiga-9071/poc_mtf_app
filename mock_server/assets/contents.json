@@ -10,22 +10,28 @@
       "availableTo": "2026-12-31T23:59:59+09:00",
       "preventCapture": true
     },
-    {
-      "id": "1",
-      "title": "DX入門ガイド",
-      "description": "デジタルトランスフォーメーションの基礎から実践まで解説。目次・内部リンク付き（8ページ）。",
-      "category": "ビジネス",
-      "url": "http://127.0.0.1:8765/dx_guide_jp.pdf"
+      {
+      "id": "13",
+      "title": "（外部PDF_15MB）道路交通センサス（中京圏）",
+      "description": "国土交通省公開の道路交通センサス中京圏報告書（PDF直リンク）。background_downloaderによるネットワークダウンロードテスト用。",
+      "category": "資料",
+      "url": "https://www.mlit.go.jp/sogoseisaku/kotu_census10/17tyuukyouken.pdf"
     },
     {
-      "id": "2",
-      "title": "AI技術と社会の未来 2024年版",
-      "description": "生成AI・産業影響・倫理規制・今後の展望を網羅したレポート。目次・外部リンク付き（9ページ）。",
-      "category": "テクノロジー",
-      "url": "http://127.0.0.1:8765/ai_society_report.pdf",
-      "availableFrom": "2024-01-01T00:00:00+09:00",
-      "availableTo": "2025-12-31T23:59:59+09:00",
-      "preventCapture": true
+      "id": "14",
+      "title": "（外部PDF_35MB）道路交通センサス（首都圏）",
+      "description": "国土交通省公開の道路交通センサス首都圏報告書（PDF直リンク）。background_downloaderによるネットワークダウンロードテスト用。",
+      "category": "資料",
+      "url": "https://www.mlit.go.jp/sogoseisaku/kotu_census10/17syutokenn.pdf"
+    },
+    {
+      "id": "20",
+      "title": "JAL SHOP 7‐8月 国内線",
+      "description": "JAL機内ショッピングのデジタルカタログ。ブラウザで閲覧できるフリップブック形式。",
+      "category": "機内ショッピング",
+      "url": "https://www.jal.co.jp/dom/service/jalshop/book/260708/#page=1",
+      "previewImage": "assets/jalshop_catalog.png",
+      "isWebContent": true
     },
     {
       "id": "3",
@@ -47,14 +53,6 @@
       "description": "日本語読み上げ機能の動作確認用PDF。標準CIDフォント（HeiseiKakuGo-W5）を使用（2ページ）。",
       "category": "テスト",
       "url": "http://127.0.0.1:8765/test_japanese_tts.pdf"
-    },
-    {
-      "id": "99",
-      "title": "大容量テストPDF（200MB）",
-      "description": "バックグラウンドダウンロード検証用。1024x1024px の画像を67ページ埋め込んだ約200MBのファイル。",
-      "category": "テスト",
-      "url": "http://127.0.0.1:8765/large_test.pdf",
-      "availableFrom": "2027-01-01T00:00:00+09:00"
     }
   ],
   "en": [
@@ -69,21 +67,13 @@
       "preventCapture": true
     },
     {
-      "id": "1",
-      "title": "DX Beginner's Guide",
-      "description": "A comprehensive introduction to Digital Transformation — from basics to practice. With TOC and internal links (8 pages).",
-      "category": "Business",
-      "url": "http://127.0.0.1:8765/dx_guide_en.pdf"
-    },
-    {
-      "id": "2",
-      "title": "AI Technology and Society 2024",
-      "description": "Covers Generative AI, industrial impact, ethics, and future outlook. With TOC and external links (7 pages).",
-      "category": "Technology",
-      "url": "http://127.0.0.1:8765/ai_society_en.pdf",
-      "availableFrom": "2024-01-01T00:00:00+09:00",
-      "availableTo": "2025-12-31T23:59:59+09:00",
-      "preventCapture": true
+      "id": "20",
+      "title": "JAL SHOP Jul-Aug Domestic",
+      "description": "JAL in-flight shopping digital catalog. Flipbook format, opens in browser.",
+      "category": "In-flight Shopping",
+      "url": "https://www.jal.co.jp/dom/service/jalshop/book/260708/#page=1",
+      "previewImage": "assets/jalshop_catalog.png",
+      "isWebContent": true
     },
     {
       "id": "3",
@@ -100,12 +90,18 @@
       "url": "http://127.0.0.1:8765/image_sample_en.pdf"
     },
     {
-      "id": "99",
-      "title": "Large File Test PDF (200MB)",
-      "description": "For background download verification. 67 pages with embedded 1024x1024px images, approx. 200MB total.",
-      "category": "Test",
-      "url": "http://127.0.0.1:8765/large_test.pdf",
-      "availableFrom": "2027-01-01T00:00:00+09:00"
+      "id": "13",
+      "title": "Road Traffic Census (Chukyo Area)",
+      "description": "Ministry of Land, Infrastructure, Transport and Tourism — Road Traffic Census for the Chukyo metropolitan area. For testing background_downloader with a direct PDF URL.",
+      "category": "Reference",
+      "url": "https://www.mlit.go.jp/sogoseisaku/kotu_census10/17tyuukyouken.pdf"
+    },
+    {
+      "id": "14",
+      "title": "Road Traffic Census (Tokyo Metro Area)",
+      "description": "Ministry of Land, Infrastructure, Transport and Tourism — Road Traffic Census for the Tokyo metropolitan area. For testing background_downloader with a direct PDF URL.",
+      "category": "Reference",
+      "url": "https://www.mlit.go.jp/sogoseisaku/kotu_census10/17syutokenn.pdf"
     }
   ]
 }

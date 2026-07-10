@@ -177,6 +177,9 @@ class AppL10n {
   /// WebView でブラウザを開くボタンのラベル
   String get openInBrowser => _ja ? 'ブラウザで開く' : 'Open in Browser';
 
+  /// Webコンテンツを開くボタンのラベル（バックナンバー）
+  String get openOnWeb => _ja ? 'Webで開く' : 'Open on Web';
+
   /// URLコピー通知メッセージのプレフィックス
   String get urlCopied => _ja ? 'URL: ' : 'URL: ';
 
