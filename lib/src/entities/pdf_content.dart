@@ -23,6 +23,7 @@ class PdfContent {
     this.availableFrom,
     this.availableTo,
     this.preventCapture = false,
+    this.isWebContent = false,
   });
 
   /// コンテンツの一意な識別子（ファイル名生成に使用）
@@ -37,7 +38,7 @@ class PdfContent {
   /// カテゴリー名（バッジとして表示）
   final String category;
 
-  /// PDFのダウンロードURL
+  /// コンテンツURL（PDFのダウンロードURL、またはWebコンテンツのURL）
   final String url;
 
   /// 公開開始日時（null = 制限なし）
@@ -51,6 +52,9 @@ class PdfContent {
 
   /// プレビュー画像のアセットパス（将来的にはAPIから取得した画像URLに置き換え予定）
   final String previewImageAsset;
+
+  /// true の場合はダウンロードせず ChromeSafariBrowser で URL を開く
+  final bool isWebContent;
 
   /// 指定日時における表示期間の状態を返す。
   AvailabilityStatus availabilityStatusAt(DateTime now) {
@@ -83,6 +87,7 @@ class PdfContent {
         ? DateTime.parse(json['availableTo'] as String)
         : null,
     preventCapture: json['preventCapture'] as bool? ?? false,
+    isWebContent: json['isWebContent'] as bool? ?? false,
   );
 }
 

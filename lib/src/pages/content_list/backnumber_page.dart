@@ -48,13 +48,14 @@ class BacknumberPage extends HookConsumerWidget {
             return const Center(child: Text('コンテンツがありません'));
           }
 
+          final screenHeight = MediaQuery.of(context).size.height;
           return GridView.builder(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              mainAxisExtent: 260,
+              mainAxisExtent: screenHeight < 700 ? 240.0 : 260.0,
             ),
             itemCount: backnumbers.length,
             itemBuilder: (context, index) => ContentPreviewCard(

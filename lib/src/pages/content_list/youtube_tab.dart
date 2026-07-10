@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-import '../youtube_player/youtube_player_page.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 // ── データ ────────────────────────────────────────────────────────────────────
 
@@ -22,31 +21,24 @@ class _YoutubeVideo {
 const _sampleVideos = [
   _YoutubeVideo(
     videoId: 'CpyAjyl5lgc',
-    title: '同じ機種のパイロットがサシで語り合ったら意見が割れました【はなそか】',
+    title: '「グアムがあるじゃん！」ホテルステイ編／JALグアム線55周年記念',
     channel: 'JAL（日本航空）公式',
-    views: '121,543回視聴',
-    duration: '24:31',
+    views: '',
+    duration: '',
   ),
   _YoutubeVideo(
-    videoId: 'CpyAjyl5lgc',
-    title: 'パイロット訓練の裏側に密着！シミュレーターで地上から空へ【JAL公式】',
+    videoId: 'y9uGSHNCPnw',
+    title: 'DREAM MILES PASSプロジェクト実施報告ムービー',
     channel: 'JAL（日本航空）公式',
-    views: '98,210回視聴',
-    duration: '18:45',
+    views: '',
+    duration: '',
   ),
   _YoutubeVideo(
-    videoId: 'CpyAjyl5lgc',
-    title: '客室乗務員が語る！機内サービスのこだわりとは【JALの仕事】',
+    videoId: '2mGi0rQEgMc',
+    title: '【着陸から離陸まで密着】飛行機が飛び立つまでの"裏側"｜JAL空港スタッフの仕事に迫る',
     channel: 'JAL（日本航空）公式',
-    views: '72,384回視聴',
-    duration: '15:20',
-  ),
-  _YoutubeVideo(
-    videoId: 'CpyAjyl5lgc',
-    title: '787整備士が語る！巨大機体を支える職人技【JAL整備】',
-    channel: 'JAL（日本航空）公式',
-    views: '56,892回視聴',
-    duration: '22:07',
+    views: '',
+    duration: '',
   ),
 ];
 
@@ -77,14 +69,18 @@ class _YoutubeVideoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => YoutubePlayerPage(
-            videoId: video.videoId,
-            title: video.title,
+      onTap: () async {
+        // ChromeSafariBrowser = iOS: SFSafariViewController / Android: Custom Tabs
+        // 本物のブラウザエンジンで開くため YouTube の WebView 検知を回避できる
+        final browser = ChromeSafariBrowser();
+        await browser.open(
+          url: WebUri('https://www.youtube.com/watch?v=${video.videoId}'),
+          settings: ChromeSafariBrowserSettings(
+            presentationStyle: ModalPresentationStyle.FULL_SCREEN,
+            barCollapsingEnabled: true,
           ),
-        ),
-      ),
+        );
+      },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -119,26 +115,27 @@ class _YoutubeVideoCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                Positioned(
-                  right: 8,
-                  bottom: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      video.duration,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                if (video.duration.isNotEmpty)
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        video.duration,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -155,15 +152,16 @@ class _YoutubeVideoCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 6),
-          Text(
-            '${video.channel}・${video.views}',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF666666),
+          if (video.views.isNotEmpty)
+            Text(
+              video.views,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF666666),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
         ],
       ),
     );
