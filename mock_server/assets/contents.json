@@ -2,27 +2,63 @@
   "ja": [
     {
       "id": "0",
-      "title": "SKYWARD 2026年5月号",
+      "title": "SKYWARD 2026年7月号",
       "description": "メルボルンとっておきの場所とびっきりの一杯",
       "category": "機内誌",
-      "url": "http://127.0.0.1:8765/skyward_2026_05.pdf",
-      "availableFrom": "2026-04-01T00:00:00+09:00",
+      "url": "http://127.0.0.1:8765/skyward_2026_07.pdf",
+      "availableFrom": "2026-06-01T00:00:00+09:00",
       "availableTo": "2026-12-31T23:59:59+09:00",
-      "preventCapture": true
+      "preventCapture": true,
+      "lastUpdatedAt": "2026-07-15T00:00:00+09:00"
+    },
+    {
+      "id": "30",
+      "title": "SKYWARD 2026年6月号",
+      "description": "フィリピン・火山と湖の避暑地へ / 隠岐ジオを巡る冒険",
+      "category": "バックナンバー",
+      "url": "http://127.0.0.1:8765/skyward_2026_07.pdf",
+      "previewImage": "packages/mock_server/assets/previews/0.png",
+      "availableTo": "2026-12-31T23:59:59+09:00",
+      "preventCapture": true,
+      "lastUpdatedAt": "2026-06-01T00:00:00+09:00"
+    },
+    {
+      "id": "31",
+      "title": "SKYWARD 2026年5月号",
+      "description": "春のアジアリゾート特集 / 台湾・美食の旅",
+      "category": "バックナンバー",
+      "url": "http://127.0.0.1:8765/skyward_2026_07.pdf",
+      "previewImage": "packages/mock_server/assets/previews/0.png",
+      "availableTo": "2026-12-31T23:59:59+09:00",
+      "preventCapture": true,
+      "lastUpdatedAt": "2026-05-01T00:00:00+09:00"
+    },
+    {
+      "id": "32",
+      "title": "SKYWARD 2026年4月号",
+      "description": "桜前線を追いかけて / 北海道・春の絶景ルート",
+      "category": "バックナンバー",
+      "url": "http://127.0.0.1:8765/skyward_2026_07.pdf",
+      "previewImage": "packages/mock_server/assets/previews/0.png",
+      "availableTo": "2026-12-31T23:59:59+09:00",
+      "preventCapture": true,
+      "lastUpdatedAt": "2026-04-01T00:00:00+09:00"
     },
       {
       "id": "13",
       "title": "（外部PDF_15MB）道路交通センサス（中京圏）",
       "description": "国土交通省公開の道路交通センサス中京圏報告書（PDF直リンク）。background_downloaderによるネットワークダウンロードテスト用。",
       "category": "資料",
-      "url": "https://www.mlit.go.jp/sogoseisaku/kotu_census10/17tyuukyouken.pdf"
+      "url": "https://www.mlit.go.jp/sogoseisaku/kotu_census10/17tyuukyouken.pdf",
+      "lastUpdatedAt": "2026-01-01T00:00:00+09:00"
     },
     {
       "id": "14",
       "title": "（外部PDF_35MB）道路交通センサス（首都圏）",
       "description": "国土交通省公開の道路交通センサス首都圏報告書（PDF直リンク）。background_downloaderによるネットワークダウンロードテスト用。",
       "category": "資料",
-      "url": "https://www.mlit.go.jp/sogoseisaku/kotu_census10/17syutokenn.pdf"
+      "url": "https://www.mlit.go.jp/sogoseisaku/kotu_census10/17syutokenn.pdf",
+      "lastUpdatedAt": "2026-01-01T00:00:00+09:00"
     },
     {
       "id": "20",
@@ -38,33 +74,70 @@
       "title": "テキスト形式サンプル",
       "description": "文字データを直接保持するテキスト形式PDF。検索・選択・コピー動作の確認用（4ページ）。",
       "category": "テスト",
-      "url": "http://127.0.0.1:8765/text_sample_jp.pdf"
+      "url": "http://127.0.0.1:8765/text_sample_jp.pdf",
+      "lastUpdatedAt": "2026-01-01T00:00:00+09:00"
     },
     {
       "id": "4",
       "title": "画像形式サンプル",
       "description": "図形・棒グラフ・円グラフ・アイコンカードで構成されたビジュアルPDF。検索・選択は不可（4ページ）。",
       "category": "テスト",
-      "url": "http://127.0.0.1:8765/image_sample_jp.pdf"
+      "url": "http://127.0.0.1:8765/image_sample_jp.pdf",
+      "lastUpdatedAt": "2026-01-01T00:00:00+09:00"
     },
     {
       "id": "5",
       "title": "TTS読み上げテスト",
       "description": "日本語読み上げ機能の動作確認用PDF。標準CIDフォント（HeiseiKakuGo-W5）を使用（2ページ）。",
       "category": "テスト",
-      "url": "http://127.0.0.1:8765/test_japanese_tts.pdf"
+      "url": "http://127.0.0.1:8765/test_japanese_tts.pdf",
+      "lastUpdatedAt": "2026-01-01T00:00:00+09:00"
     }
   ],
   "en": [
     {
       "id": "0",
-      "title": "SKYWARD May 2026",
+      "title": "SKYWARD July 2026",
       "description": "Melbourne's favorite spots and finest drinks",
       "category": "In-flight Magazine",
-      "url": "http://127.0.0.1:8765/skyward_2026_05.pdf",
-      "availableFrom": "2026-04-01T00:00:00+09:00",
+      "url": "http://127.0.0.1:8765/skyward_2026_07.pdf",
+      "availableFrom": "2026-06-01T00:00:00+09:00",
       "availableTo": "2026-12-31T23:59:59+09:00",
-      "preventCapture": true
+      "preventCapture": true,
+      "lastUpdatedAt": "2026-07-15T00:00:00+09:00"
+    },
+    {
+      "id": "30",
+      "title": "SKYWARD June 2026",
+      "description": "Philippines: Escape to Volcano & Lake / Exploring Oki Island's Geopark",
+      "category": "Back Issue",
+      "url": "http://127.0.0.1:8765/skyward_2026_07.pdf",
+      "previewImage": "packages/mock_server/assets/previews/0.png",
+      "availableTo": "2026-12-31T23:59:59+09:00",
+      "preventCapture": true,
+      "lastUpdatedAt": "2026-06-01T00:00:00+09:00"
+    },
+    {
+      "id": "31",
+      "title": "SKYWARD May 2026",
+      "description": "Spring Asia Resort Special / Taiwan Gourmet Journey",
+      "category": "Back Issue",
+      "url": "http://127.0.0.1:8765/skyward_2026_07.pdf",
+      "previewImage": "packages/mock_server/assets/previews/0.png",
+      "availableTo": "2026-12-31T23:59:59+09:00",
+      "preventCapture": true,
+      "lastUpdatedAt": "2026-05-01T00:00:00+09:00"
+    },
+    {
+      "id": "32",
+      "title": "SKYWARD April 2026",
+      "description": "Chasing the Cherry Blossom Front / Hokkaido's Scenic Spring Route",
+      "category": "Back Issue",
+      "url": "http://127.0.0.1:8765/skyward_2026_07.pdf",
+      "previewImage": "packages/mock_server/assets/previews/0.png",
+      "availableTo": "2026-12-31T23:59:59+09:00",
+      "preventCapture": true,
+      "lastUpdatedAt": "2026-04-01T00:00:00+09:00"
     },
     {
       "id": "20",
@@ -80,28 +153,32 @@
       "title": "Text Format Sample",
       "description": "A text-based PDF with embedded character data. Use to verify search, selection, and copy features (4 pages).",
       "category": "Test",
-      "url": "http://127.0.0.1:8765/text_sample_en.pdf"
+      "url": "http://127.0.0.1:8765/text_sample_en.pdf",
+      "lastUpdatedAt": "2026-01-01T00:00:00+09:00"
     },
     {
       "id": "4",
       "title": "Image Format Sample",
       "description": "A visual PDF composed of shapes, bar charts, pie charts, and icon cards. No text search or selection (4 pages).",
       "category": "Test",
-      "url": "http://127.0.0.1:8765/image_sample_en.pdf"
+      "url": "http://127.0.0.1:8765/image_sample_en.pdf",
+      "lastUpdatedAt": "2026-01-01T00:00:00+09:00"
     },
     {
       "id": "13",
       "title": "Road Traffic Census (Chukyo Area)",
       "description": "Ministry of Land, Infrastructure, Transport and Tourism — Road Traffic Census for the Chukyo metropolitan area. For testing background_downloader with a direct PDF URL.",
       "category": "Reference",
-      "url": "https://www.mlit.go.jp/sogoseisaku/kotu_census10/17tyuukyouken.pdf"
+      "url": "https://www.mlit.go.jp/sogoseisaku/kotu_census10/17tyuukyouken.pdf",
+      "lastUpdatedAt": "2026-01-01T00:00:00+09:00"
     },
     {
       "id": "14",
       "title": "Road Traffic Census (Tokyo Metro Area)",
       "description": "Ministry of Land, Infrastructure, Transport and Tourism — Road Traffic Census for the Tokyo metropolitan area. For testing background_downloader with a direct PDF URL.",
       "category": "Reference",
-      "url": "https://www.mlit.go.jp/sogoseisaku/kotu_census10/17syutokenn.pdf"
+      "url": "https://www.mlit.go.jp/sogoseisaku/kotu_census10/17syutokenn.pdf",
+      "lastUpdatedAt": "2026-01-01T00:00:00+09:00"
     }
   ]
 }

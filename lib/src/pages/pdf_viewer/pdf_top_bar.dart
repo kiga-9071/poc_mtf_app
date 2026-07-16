@@ -19,6 +19,8 @@ class PdfTopBar extends StatelessWidget {
     required this.onBack,
     required this.ttsStatus,
     required this.onTtsTap,
+    this.isSplitMode = false,
+    this.onSplitToggle,
   });
 
   /// AppBar に表示するタイトル（ファイル名）
@@ -53,6 +55,12 @@ class PdfTopBar extends StatelessWidget {
 
   /// 読み上げボタンのタップコールバック
   final VoidCallback onTtsTap;
+
+  /// 見開き分割モードが有効かどうか
+  final bool isSplitMode;
+
+  /// 見開き分割モードのトグルコールバック（null = ボタン非表示）
+  final VoidCallback? onSplitToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -147,6 +155,16 @@ class PdfTopBar extends StatelessWidget {
                   },
                   onPressed: onTtsTap,
                 ),
+                // 見開き分割モードトグルボタン
+                if (onSplitToggle != null)
+                  IconButton(
+                    icon: Icon(
+                      Icons.vertical_split,
+                      color: isSplitMode ? Colors.lightBlue : fgColor,
+                    ),
+                    tooltip: isSplitMode ? '見開き分割: ON' : '見開き分割: OFF',
+                    onPressed: onSplitToggle,
+                  ),
               ],
             ],
           ),

@@ -24,6 +24,7 @@ class PdfContent {
     this.availableTo,
     this.preventCapture = false,
     this.isWebContent = false,
+    this.lastUpdatedAt,
   });
 
   /// コンテンツの一意な識別子（ファイル名生成に使用）
@@ -55,6 +56,9 @@ class PdfContent {
 
   /// true の場合はダウンロードせず ChromeSafariBrowser で URL を開く
   final bool isWebContent;
+
+  /// マスターJSONで管理するコンテンツの最終更新日時（null = バージョン管理なし）
+  final DateTime? lastUpdatedAt;
 
   /// 指定日時における表示期間の状態を返す。
   AvailabilityStatus availabilityStatusAt(DateTime now) {
@@ -88,6 +92,9 @@ class PdfContent {
         : null,
     preventCapture: json['preventCapture'] as bool? ?? false,
     isWebContent: json['isWebContent'] as bool? ?? false,
+    lastUpdatedAt: json['lastUpdatedAt'] != null
+        ? DateTime.parse(json['lastUpdatedAt'] as String)
+        : null,
   );
 }
 

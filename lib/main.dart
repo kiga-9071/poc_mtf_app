@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'dart:io';
+
+import 'package:background_downloader/background_downloader.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -8,6 +11,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mock_server/pdf_asset_server.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'src/controllers/locale_controller.dart';
 import 'src/controllers/theme_controller.dart';
@@ -16,7 +20,14 @@ import 'src/l10n.dart';
 import 'src/pages/content_list/backnumber_page.dart';
 import 'src/pages/content_list/content_list_page.dart';
 import 'src/pages/pdf_viewer/pdf_viewer_page.dart';
+import 'src/services/notification_service.dart';
+import 'src/services/storage_limit_service.dart';
 import 'src/webview/webview_page.dart';
+
+// ── グローバルキー ────────────────────────────────────────────────────────────
+
+/// 通知アクションハンドラから SnackBar を表示するための ScaffoldMessenger キー。
+final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 // ── ルーティング定義 ──────────────────────────────────────────────────────────
 
@@ -70,56 +81,37 @@ final _router = GoRouter(
 /// アプリ内 PDF サーバーのシングルトン。ホットリスタートでの二重バインドを防ぐためトップレベルで保持する。
 final _pdfServer = PdfAssetServer();
 
-/// [url] の末尾パスセグメントをファイル名として返す。[Uri.parse] 失敗時は `/` 分割でフォールバック。
-String _filenameFromUrl(String url) {
-  try {
-    final uri = Uri.parse(url);
-    if (uri.pathSegments.isNotEmpty) {
-      return uri.pathSegments.last;
-    }
-  } catch (_) {
-    // URL として解釈できない場合は末尾セグメントをフォールバック利用する。
-  }
-  return url.split('/').last;
-}
-
-/// `contents.json` を唯一の真実源として配信対象 PDF を特定し、[_pdfServer] を起動する。
+/// [_pdfServer] を起動する。
 ///
-/// assets のロードに失敗してもアプリ起動は継続する（サーバーモードでのダウンロードのみ失敗）。
+/// contents.json のみをメモリに保持し、PDF は最初のリクエスト時に
+/// assets から一時ディレクトリへ展開してから配信する（遅延ロード）。
+/// これにより大容量 PDF があってもアプリ起動がブロックされない。
 Future<void> _startPdfServer() async {
   try {
     final raw = await rootBundle.loadString(
       'packages/mock_server/assets/contents.json',
     );
-    final data = jsonDecode(raw) as Map<String, dynamic>;
 
-    final filenames = <String>{};
-    for (final value in data.values) {
-      final items = value as List<dynamic>;
-      for (final item in items) {
-        final url = (item as Map<String, dynamic>)['url'] as String;
-        filenames.add(_filenameFromUrl(url));
-      }
-    }
-
-    final cache = <String, Uint8List>{};
-
-    // contents.json として配信する
-    cache['contents.json'] = Uint8List.fromList(utf8.encode(raw));
-
-    for (final filename in filenames) {
-      try {
-        final asset = await rootBundle.load(
-          'packages/mock_server/assets/pdfs/$filename',
-        );
-        cache[filename] = asset.buffer.asUint8List();
-      } catch (_) {
-        // アセットに存在しないファイルはスキップする。
-        debugPrint('PDF server: skipping missing asset "$filename"');
-      }
-    }
+    // contents.json のみインメモリで保持。PDF は遅延ロード。
+    final cache = <String, Uint8List>{
+      'contents.json': Uint8List.fromList(utf8.encode(raw)),
+    };
 
     await _pdfServer.start(cache);
+
+    // サーバー起動後、PDF をバックグラウンドで一時ディレクトリへ展開しておく。
+    // await しないことで起動を妨げず、ユーザーが PDF を開く前に展開が終わる。
+    final data = jsonDecode(raw) as Map<String, dynamic>;
+    final filenames = <String>{};
+    for (final value in data.values) {
+      for (final item in (value as List<dynamic>)) {
+        final url = (item as Map<String, dynamic>)['url'] as String? ?? '';
+        if (url.contains('127.0.0.1')) {
+          filenames.add(url.split('/').last);
+        }
+      }
+    }
+    _pdfServer.warmUp(filenames); // ignore: unawaited_futures
   } catch (e, st) {
     debugPrint('PDF server start failed: $e\n$st');
   }
@@ -128,8 +120,71 @@ Future<void> _startPdfServer() async {
 Future<void> main() async {
   // Flutter エンジンの初期化（SharedPreferences など非同期処理の前に必要）
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await _startPdfServer();
+  await Future.wait([
+    Firebase.initializeApp(),
+    NotificationService.initialize(
+      onTap: (payload) {
+        // 通知本体タップ → バックナンバー一覧へ遷移
+        _router.go('/backnumber');
+      },
+      onAction: (actionId, payload) async {
+        if (actionId != NotificationService.actionDownload) return;
+        final downloadUrl = payload;
+        if (downloadUrl == null || downloadUrl.isEmpty) return;
+
+        // ── 容量上限チェック ────────────────────────────────────────────────
+        final exceeded = await StorageLimitService.checkBeforeDownload();
+        if (exceeded != null) {
+          _scaffoldMessengerKey.currentState?.showSnackBar(
+            SnackBar(
+              content: Text(
+                '保存容量の上限（${StorageLimitService.formatBytes(exceeded.limit)}）に達しています。'
+                '不要なPDFを削除してください。',
+              ),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+          return;
+        }
+
+        final messenger = _scaffoldMessengerKey.currentState;
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text('ダウンロードを開始しました'),
+            duration: Duration(minutes: 2),
+          ),
+        );
+
+        final filename = downloadUrl.split('/').last;
+        final task = DownloadTask(
+          url: downloadUrl,
+          filename: filename,
+          baseDirectory: BaseDirectory.applicationDocuments,
+          updates: Updates.statusAndProgress,
+        );
+        final result = await FileDownloader().download(task);
+
+        messenger?.hideCurrentSnackBar();
+        if (result.status == TaskStatus.complete) {
+          final dir = await getApplicationDocumentsDirectory();
+          final saved = File('${dir.path}/$filename');
+          if (saved.existsSync()) {
+            // ignore: unawaited_futures
+            // 通知経由ダウンロードはcontentIdが不明なため 'unknown' を渡す。
+            // LRU削除対象にはなるが期限切れ判定はスキップされる。
+            StorageLimitService.recordFile(
+                filename, saved.lengthSync(), 'unknown');
+          }
+        }
+        final message = result.status == TaskStatus.complete
+            ? 'ダウンロードが完了しました'
+            : 'ダウンロードに失敗しました (${result.status})';
+        messenger?.showSnackBar(SnackBar(content: Text(message)));
+        debugPrint('[Download] via notification action: ${result.status}');
+      },
+    ),
+    _startPdfServer(),
+  ]);
 
   // 16ms を超えたフレームをログ出力（ページ送り・ズームなどの応答速度計測用）
   WidgetsBinding.instance.addTimingsCallback((timings) {
@@ -223,6 +278,7 @@ class MyApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
+      scaffoldMessengerKey: _scaffoldMessengerKey,
       title: 'PDF Viewer',
       // 表示言語の設定
       locale: locale,

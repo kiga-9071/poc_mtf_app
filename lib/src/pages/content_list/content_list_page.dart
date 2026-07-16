@@ -11,7 +11,12 @@ import '../../controllers/content_master_controller.dart';
 import '../../controllers/locale_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../l10n.dart';
+import '../../services/analytics_service.dart';
+import '../../services/content_update_service.dart';
+import '../../services/notification_service.dart';
+import '../../services/storage_limit_service.dart';
 import 'content_featured_card.dart';
+import 'storage_limit_dialog.dart';
 import 'content_preview_card.dart';
 import 'shop_tab.dart';
 import 'youtube_tab.dart';
@@ -54,6 +59,147 @@ Future<void> resetStorage(BuildContext context) async {
   if (context.mounted) {
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('ストレージを初期化しました')));
+  }
+}
+
+// ── ローカルPush通知ダイアログ ───────────────────────────────────────────────
+
+Future<void> showNotificationDialog(BuildContext context) async {
+  // 権限が未付与の場合はリクエスト（初回のみシステムダイアログが表示される）
+  await NotificationService.requestPermissions();
+  if (!context.mounted) return;
+
+  final scheduledAt = NotificationService.scheduledAt;
+  final action = await showDialog<String>(
+    context: context,
+    builder: (ctx) {
+      final scheduled = scheduledAt;
+      final scheduledLabel = scheduled != null
+          ? '${scheduled.hour.toString().padLeft(2, '0')}:${scheduled.minute.toString().padLeft(2, '0')}'
+          : null;
+      return AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.notifications_active, size: 22),
+            SizedBox(width: 8),
+            Text('通知テスト'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (scheduledLabel != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.alarm, size: 16, color: Colors.blue),
+                    const SizedBox(width: 8),
+                    Text(
+                      'スケジュール中: $scheduledLabel',
+                      style: const TextStyle(color: Colors.blue, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            ElevatedButton.icon(
+              icon: const Icon(Icons.send, size: 18),
+              label: const Text('今すぐ送信'),
+              onPressed: () => Navigator.of(ctx).pop('immediate'),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.schedule, size: 18),
+              label: const Text('時刻を指定してスケジュール'),
+              onPressed: () => Navigator.of(ctx).pop('schedule'),
+            ),
+            const SizedBox(height: 4),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              onPressed: () async {
+                await NotificationService.cancelAll();
+                if (ctx.mounted) {
+                  Navigator.of(ctx).pop();
+                }
+              },
+              child: const Text('スケジュール済み通知をキャンセル'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('閉じる'),
+          ),
+        ],
+      );
+    },
+  );
+  if (!context.mounted) return;
+
+  if (action == 'immediate') {
+    await NotificationService.show(
+      id: 100,
+      title: 'JAL機内誌からのお知らせ',
+      body: 'SKYWARD 2026年7月号が更新されました。最新号をご確認ください。',
+      payload: '/backnumber',
+      downloadUrl: 'http://127.0.0.1:8765/skyward_2026_07.pdf',
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('通知を送信しました')),
+      );
+    }
+  } else if (action == 'schedule') {
+    final now = DateTime.now();
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: now.hour, minute: (now.minute + 1) % 60),
+      initialEntryMode: TimePickerEntryMode.input,
+    );
+
+    if (picked == null || !context.mounted) return;
+
+    final hour = picked.hour;
+    final minute = picked.minute;
+
+    var scheduled = DateTime(now.year, now.month, now.day, hour, minute);
+    if (scheduled.isBefore(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+
+    try {
+      await NotificationService.schedule(
+        id: 200,
+        title: 'JAL機内誌からのお知らせ',
+        body: 'SKYWARD 2026年7月号が更新されました。最新号をご確認ください。',
+        scheduledDate: scheduled,
+        payload: '/backnumber',
+        downloadUrl: 'http://127.0.0.1:8765/skyward_2026_07.pdf',
+      );
+      if (context.mounted) {
+        final h = hour.toString().padLeft(2, '0');
+        final m = minute.toString().padLeft(2, '0');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$h:$m に通知をスケジュールしました')),
+        );
+      }
+    } catch (e) {
+      debugPrint('[Notification] schedule error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('通知のスケジュールに失敗しました: $e')),
+        );
+      }
+    }
   }
 }
 
@@ -206,9 +352,11 @@ class ContentListPage extends HookConsumerWidget {
     required BuildContext context,
     required String imagePath,
     required String tag,
+    List<String>? tags,
     required String title,
     String? url,
   }) {
+    final effectiveTags = tags ?? [tag];
     final card = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
@@ -237,20 +385,24 @@ class ContentListPage extends HookConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE1E3E6),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Text(
-                      tag,
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w300,
-                          color: Colors.black),
-                    ),
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: effectiveTags.map((t) => Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE1E3E6),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Text(
+                        t,
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w300,
+                            color: Colors.black),
+                      ),
+                    )).toList(),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -291,9 +443,26 @@ class ContentListPage extends HookConsumerWidget {
     useEffect(() {
       if (lifecycle == AppLifecycleState.resumed) {
         ref.read(contentMasterProvider.notifier).refresh();
+        // 実ファイルと DB の差分を補正する（アプリ外からの削除に対応）
+        getApplicationDocumentsDirectory()
+            .then(StorageLimitService.syncWithDirectory);
       }
       return null;
     }, [lifecycle]);
+
+    // マスターJSON取得のたびに差し替えチェックを実行
+    ref.listen(contentMasterProvider, (_, next) {
+      next.whenData((master) {
+        getApplicationDocumentsDirectory().then((dir) {
+          final langCode = ref.read(localeProvider).languageCode;
+          ContentUpdateService.checkAndUpdateAll(
+            master.contentsFor(langCode),
+            langCode,
+            dir,
+          );
+        });
+      });
+    });
 
     final themeIcon = switch (themeMode) {
       ThemeMode.dark => Icons.dark_mode,
@@ -301,14 +470,26 @@ class ContentListPage extends HookConsumerWidget {
       _ => Icons.brightness_auto,
     };
 
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
+    final tabController = useTabController(initialLength: 3);
+    useEffect(() {
+      void onTabChanged() {
+        if (!tabController.indexIsChanging) return;
+        final names = ['skyward', 'jal_shop', 'youtube'];
+        AnalyticsService.logContentTabSwitch(
+          tabName: names[tabController.index],
+        );
+      }
+      tabController.addListener(onTabChanged);
+      return () => tabController.removeListener(onTabChanged);
+    }, [tabController]);
+
+    return Scaffold(
+      appBar: AppBar(
           title: Text(l10n.contentList),
           centerTitle: true,
-          bottom: const TabBar(
-            tabs: [
+          bottom: TabBar(
+            controller: tabController,
+            tabs: const [
               Tab(text: 'SKYWARD'),
               Tab(text: 'JAL SHOP'),
               Tab(
@@ -340,7 +521,11 @@ class ContentListPage extends HookConsumerWidget {
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert),
               onSelected: (value) async {
-                if (value == 'reset') {
+                if (value == 'notification') {
+                  await showNotificationDialog(context);
+                } else if (value == 'storage') {
+                  await showStorageSettingsDialog(context);
+                } else if (value == 'reset') {
                   await resetStorage(context);
                   if (context.mounted) {
                     reloadKey.value++;
@@ -349,6 +534,26 @@ class ContentListPage extends HookConsumerWidget {
                 }
               },
               itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'notification',
+                  child: Row(
+                    children: [
+                      Icon(Icons.notifications, size: 20),
+                      SizedBox(width: 8),
+                      Text('通知テスト'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'storage',
+                  child: Row(
+                    children: [
+                      Icon(Icons.storage, size: 20),
+                      SizedBox(width: 8),
+                      Text('ストレージ設定'),
+                    ],
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'reset',
                   child: Row(
@@ -365,6 +570,7 @@ class ContentListPage extends HookConsumerWidget {
           ],
         ),
         body: TabBarView(
+          controller: tabController,
           children: [
             // ── SKYWARDタブ ────────────────────────────────────────────────
             masterAsync.when(
@@ -511,89 +717,104 @@ class ContentListPage extends HookConsumerWidget {
                         ],
                       ),
 
+                      const SizedBox(height: 24),
+
+                      // ── バナー広告（タブの24px下） ─────────────────────
+                      GestureDetector(
+                        onTap: () => context.push(
+                          '/webview',
+                          extra: 'https://www.ja-zcf.co.jp/learned/all-japan/',
+                        ),
+                        child: Image.asset(
+                          'assets/banner_zennoh_chicken.png',
+                          width: double.infinity,
+                          fit: BoxFit.fitWidth,
+                        ),
+                      ),
+
                       const SizedBox(height: 32),
 
                       // ── コンテンツ2列グリッド ─────────────────────────
-                      Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 24),
-                        child: selectedTag.value == '旅・文化'
-                            ? GridView.count(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 24,
-                                childAspectRatio: 163 / 258,
-                                children: [
-                                  _buildStaticArticleCard(
-                                    context: context,
-                                    imagePath: 'assets/kochi_katsuo.jpg',
-                                    tag: '高知',
-                                    title: '初夏、かつおを食べに',
-                                    url: 'https://skywardplus.jal.co.jp/plus_one/other/sightseeing_toyama/',
-                                  ),
-                                  _buildStaticArticleCard(
-                                    context: context,
-                                    imagePath: 'assets/local_chain_ramen.jpg',
-                                    tag: 'グルメ',
-                                    title: '噂のローカルチェーン飯',
-                                    url: 'https://skywardplus.jal.co.jp/plus_one/other/sightseeing_kumamoto/',
-                                  ),
-                                  _buildStaticArticleCard(
-                                    context: context,
-                                    imagePath: 'assets/sora_gourmet_aomori.jpg',
-                                    tag: '青森',
-                                    title: '食べたい！買いたい！空グルメ！',
-                                    url: 'https://skywardplus.jal.co.jp/gourmet/crew/soysoy_cafe/',
-                                  ),
-                                  _buildStaticArticleCard(
-                                    context: context,
-                                    imagePath: 'assets/ichiro_malt.jpg',
-                                    tag: '秩父',
-                                    title: 'イッピンに宿る物語',
-                                    url: 'https://skywardplus.jal.co.jp/view/crew/nihondaira_yume_terrace/',
-                                  ),
-                                  _buildStaticArticleCard(
-                                    context: context,
-                                    imagePath: 'assets/pickup_carlease.jpg',
-                                    tag: 'カーリース',
-                                    title: '【2026年6月最新】カーリースおすすめ12社を比較して紹介！',
-                                    url: 'https://skywardplus.jal.co.jp/plus_one/solution/car_lease/recommend/',
-                                  ),
-                                  _buildStaticArticleCard(
-                                    context: context,
-                                    imagePath: 'assets/pickup_okamoto_sanbashi.jpg',
-                                    tag: '千葉',
-                                    title: '岡本桟橋（原岡桟橋）徹底ガイド｜絶景の夕日と富士山、アクセス情報まとめ',
-                                    url: 'https://skywardplus.jal.co.jp/hanto/plus_one/okamoto-sanbashi/',
-                                  ),
-                                ],
-                              )
-                            : selectedTag.value == null
-                                ? const SizedBox.shrink()
-                                : GridView.builder(
-                                    shrinkWrap: true,
-                                    physics:
-                                        const NeverScrollableScrollPhysics(),
-                                    gridDelegate:
-                                        SliverGridDelegateWithFixedCrossAxisCount(
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (selectedTag.value != null)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              child: selectedTag.value == '旅・文化'
+                                  ? GridView.count(
+                                      shrinkWrap: true,
+                                      physics: const NeverScrollableScrollPhysics(),
                                       crossAxisCount: 2,
                                       crossAxisSpacing: 16,
-                                      mainAxisSpacing: 16,
-                                      mainAxisExtent: MediaQuery.of(context).size.height < 700 ? 240.0 : 260.0,
+                                      mainAxisSpacing: 24,
+                                      childAspectRatio: 163 / 258,
+                                      children: [
+                                        _buildStaticArticleCard(
+                                          context: context,
+                                          imagePath: 'assets/kochi_katsuo.jpg',
+                                          tag: '高知',
+                                          title: '初夏、かつおを食べに',
+                                          url: 'https://ontrip.jal.co.jp/chugoku-shikoku/17834167',
+                                        ),
+                                        _buildStaticArticleCard(
+                                          context: context,
+                                          imagePath: 'assets/local_chain_ramen.jpg',
+                                          tag: 'グルメ',
+                                          title: '噂のローカルチェーン飯',
+                                          url: 'https://ontrip.jal.co.jp/hokkaido/17777179',
+                                        ),
+                                        _buildStaticArticleCard(
+                                          context: context,
+                                          imagePath: 'assets/sora_gourmet_aomori.jpg',
+                                          tag: '沖縄',
+                                          title: '食べたい！買いたい！空グルメ！',
+                                          url: 'https://ontrip.jal.co.jp/okinawa/17707921',
+                                        ),
+                                        _buildStaticArticleCard(
+                                          context: context,
+                                          imagePath: 'assets/torimeshi_kagoshima.png',
+                                          tag: 'ad',
+                                          tags: const ['ad', '鹿児島'],
+                                          title: '戦前から伝わる「高浜とりめし」と「高浜とりめし学会」が、すごい！',
+                                          url: 'https://www.ja-zcf.co.jp/learned/all-japan/828/',
+                                        ),
+                                        _buildStaticArticleCard(
+                                          context: context,
+                                          imagePath: 'assets/pickup_carlease.jpg',
+                                          tag: 'カーリース',
+                                          title: '【2026年6月最新】カーリースおすすめ12社を比較して紹介！',
+                                          url: 'https://skywardplus.jal.co.jp/plus_one/solution/car_lease/recommend/',
+                                        ),
+                                        _buildStaticArticleCard(
+                                          context: context,
+                                          imagePath: 'assets/pickup_okamoto_sanbashi.jpg',
+                                          tag: '千葉',
+                                          title: '岡本桟橋（原岡桟橋）徹底ガイド｜絶景の夕日と富士山、アクセス情報まとめ',
+                                          url: 'https://skywardplus.jal.co.jp/hanto/plus_one/okamoto-sanbashi/',
+                                        ),
+                                      ],
+                                    )
+                                  : GridView.builder(
+                                      shrinkWrap: true,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 2,
+                                        crossAxisSpacing: 16,
+                                        mainAxisSpacing: 16,
+                                        mainAxisExtent: MediaQuery.of(context).size.height < 700 ? 240.0 : 260.0,
+                                      ),
+                                      itemCount: filtered.length,
+                                      itemBuilder: (context, index) => ContentPreviewCard(
+                                        key: ValueKey('${reloadKey.value}_$index'),
+                                        content: filtered[index],
+                                        langCode: locale.languageCode,
+                                        isAvailable: filtered[index].isAvailableAt(now),
+                                      ),
                                     ),
-                                    itemCount: filtered.length,
-                                    itemBuilder: (context, index) =>
-                                        ContentPreviewCard(
-                                      key: ValueKey(
-                                          '${reloadKey.value}_$index'),
-                                      content: filtered[index],
-                                      langCode: locale.languageCode,
-                                      isAvailable:
-                                          filtered[index].isAvailableAt(now),
-                                    ),
-                                  ),
+                            ),
+                        ],
                       ),
 
                       const SizedBox(height: 24),
@@ -612,7 +833,6 @@ class ContentListPage extends HookConsumerWidget {
             const YoutubeTab(),
           ],
         ),
-      ),
     );
   }
 }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>enterprise</string>
+    <key>teamID</key>
+    <string>7WEFXECW3X</string>
+    <key>signingStyle</key>
+    <string>manual</string>
+    <key>signingCertificate</key>
+    <string>iPhone Distribution: ACCENTURE JAPAN LTD.</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>jp.co.pdf.example.dev</key>
+        <string>JAL MTF Project PoC App</string>
+    </dict>
+    <key>stripSwiftSymbols</key>
+    <true/>
+    <key>thinning</key>
+    <string>&lt;none&gt;</string>
+</dict>
+</plist>

@@ -37,6 +37,29 @@ import PDFKit
       AppDelegate.recognizeText(imagePath: imagePath, result: result)
     }
 
+    // PDFKit サムネイルチャンネル（pdfrx より高速なサムネイル専用 API）
+    guard let thumbRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "PdfThumbnailPlugin") else {
+      return
+    }
+    let thumbChannel = FlutterMethodChannel(
+      name: "app.pdf.thumbnail",
+      binaryMessenger: thumbRegistrar.messenger()
+    )
+    thumbChannel.setMethodCallHandler { call, result in
+      guard call.method == "getThumbnail" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      guard let args = call.arguments as? [String: Any],
+            let filePath = args["path"] as? String,
+            let pageIndex = args["pageIndex"] as? Int,
+            let width = args["width"] as? Double else {
+        result(FlutterError(code: "INVALID_ARGS", message: nil, details: nil))
+        return
+      }
+      AppDelegate.getThumbnail(filePath: filePath, pageIndex: pageIndex, width: CGFloat(width), result: result)
+    }
+
     // PDFKit テキスト抽出チャンネル
     let pdfChannel = FlutterMethodChannel(
       name: "app.tts.pdf",
@@ -54,6 +77,39 @@ import PDFKit
         return
       }
       AppDelegate.extractTextWithPDFKit(filePath: filePath, pageIndex: pageIndex, result: result)
+    }
+  }
+
+  /// PDFKit の thumbnail API でページサムネイルを JPEG として返す。
+  /// pdfrx の draw() よりも高速なサムネイル専用コードパスを使用する。
+  /// 多くのプロ向け PDF（雑誌等）は内蔵サムネイルを持つためほぼ即時に返る。
+  private static func getThumbnail(
+    filePath: String, pageIndex: Int, width: CGFloat, result: @escaping FlutterResult
+  ) {
+    DispatchQueue.global(qos: .userInteractive).async {
+      let url = URL(fileURLWithPath: filePath)
+      guard let doc = PDFDocument(url: url),
+            pageIndex >= 0 && pageIndex < doc.pageCount,
+            let page = doc.page(at: pageIndex) else {
+        DispatchQueue.main.async { result(nil) }
+        return
+      }
+      let mediaBox = page.bounds(for: .mediaBox)
+      guard mediaBox.width > 0 else {
+        DispatchQueue.main.async { result(nil) }
+        return
+      }
+      let height = width * mediaBox.height / mediaBox.width
+      let size = CGSize(width: width, height: height)
+      // PDFPage.thumbnail() は draw() より高速なサムネイル専用パス
+      let thumbnail = page.thumbnail(of: size, for: .mediaBox)
+      guard let data = thumbnail.jpegData(compressionQuality: 0.75) else {
+        DispatchQueue.main.async { result(nil) }
+        return
+      }
+      DispatchQueue.main.async {
+        result(FlutterStandardTypedData(bytes: data))
+      }
     }
   }
 

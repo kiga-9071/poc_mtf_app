@@ -11,6 +11,8 @@ import 'package:path_provider/path_provider.dart';
 import '../../entities/pdf_content.dart';
 import '../../entities/viewer_args.dart';
 import '../../l10n.dart';
+import '../../services/storage_limit_service.dart';
+import 'storage_limit_dialog.dart';
 
 /// テキスト情報を中心としたリスト表示用のカードウィジェット。
 /// カテゴリーバッジ・説明文・ダウンロード進捗・削除ボタンなど詳細情報を表示する。
@@ -67,6 +69,20 @@ class ContentListCard extends HookConsumerWidget {
 
     Future<void> download() async {
       if (dirSnapshot.data == null) return;
+
+      // ── 容量上限チェック ──────────────────────────────────────────────────
+      final exceeded = await StorageLimitService.checkBeforeDownload();
+      if (exceeded != null) {
+        if (context.mounted) {
+          await showStorageLimitExceededDialog(
+            context,
+            usage: exceeded.usage,
+            limit: exceeded.limit,
+          );
+        }
+        return;
+      }
+
       final path = buildSavePath(dirSnapshot.data!, content, langCode);
       isDownloading.value = true;
       progress.value = 0;
@@ -86,6 +102,9 @@ class ContentListCard extends HookConsumerWidget {
         if (!context.mounted) return;
         cancelToken.value = null;
         isDownloading.value = false;
+        // ignore: unawaited_futures
+        StorageLimitService.recordFile(
+            path.split('/').last, File(path).lengthSync(), content.id);
         if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
         context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
       } on DioException catch (e) {
@@ -106,6 +125,9 @@ class ContentListCard extends HookConsumerWidget {
           if (!context.mounted) return;
           isDownloading.value = false;
           progress.value = 1.0;
+          // ignore: unawaited_futures
+          StorageLimitService.recordFile(
+              path.split('/').last, File(path).lengthSync(), content.id);
           if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
           context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
         } catch (fallbackErr) {
@@ -150,7 +172,10 @@ class ContentListCard extends HookConsumerWidget {
       final path = savedPath.value;
       if (path == null) return;
       final file = File(path);
-      if (await file.exists()) await file.delete();
+      if (await file.exists()) {
+        await StorageLimitService.removeFile(path.split('/').last);
+        await file.delete();
+      }
       if (context.mounted) {
         isDownloaded.value = false;
         savedPath.value = null;

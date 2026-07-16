@@ -2,6 +2,13 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <!-- ローカルPush通知 -->
+    <!-- Android 13+ の通知権限（requestNotificationsPermission() で実行時リクエスト） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- スケジュール通知の正確な時刻指定（Android 12+） -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <!-- 端末再起動後にスケジュール通知を復元するため -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
         android:label="pdf_app"
         android:name="${applicationName}"

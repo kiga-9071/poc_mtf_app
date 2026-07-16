@@ -71,13 +71,10 @@ class _WebViewPageState extends State<WebViewPage> {
         initialSettings: InAppWebViewSettings(
           // JavaScript を有効化
           javaScriptEnabled: true,
-          // URL ナビゲーションをコールバックで制御可能にする
-          useShouldOverrideUrlLoading: true,
           // インライン動画再生を許可
           allowsInlineMediaPlayback: true,
           // 動画の自動再生をユーザー操作なしで許可
           mediaPlaybackRequiresUserGesture: false,
-          // HTTP（平文通信）を許可
           clearCache: false,
         ),
         // WebView が生成されたタイミングでコントローラーを保持

@@ -10,9 +10,15 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../controllers/content_master_controller.dart';
 import '../../entities/pdf_content.dart';
 import '../../entities/viewer_args.dart';
 import '../../l10n.dart';
+import '../../services/storage_limit_service.dart';
+import 'storage_limit_dialog.dart';
+import '../../services/analytics_service.dart';
+import '../../services/content_update_service.dart';
+import '../../services/pdf_preview_cache.dart';
 
 /// PDFの1ページ目サムネイルを大きく表示するグリッド用カードウィジェット。
 /// - ダウンロード済み: PDFの1ページ目をサムネイル表示
@@ -77,11 +83,65 @@ class ContentPreviewCard extends HookConsumerWidget {
       return null;
     }, [dirSnapshot.data]);
 
+    // ダウンロード済みPDFの1ページ目をバックグラウンドでキャッシュ生成する。
+    // 「開く」タップ時に < 100ms で表示できるよう事前レンダリングしておく。
+    useEffect(() {
+      final filePath = savedPath.value;
+      if (filePath == null) return null;
+      PdfPreviewCache.warmUp(filePath); // ignore: unawaited_futures
+      return null;
+    }, [savedPath.value]);
+
     Future<void> download() async {
       if (dirSnapshot.data == null) return;
+
+      // ── 容量上限チェック → 自動クリーンアップ ────────────────────────────
+      final exceeded = await StorageLimitService.checkBeforeDownload();
+      if (exceeded != null) {
+        // マスターJSONの表示期間を参照して期限切れ・LRU順に自動削除を試みる
+        final masterData = ref.read(contentMasterProvider).valueOrNull;
+        final allContents =
+            masterData?.contents.values.expand((l) => l) ?? [];
+        final expirationByContentId = {
+          for (final c in allContents) c.id: c.availableTo,
+        };
+        final deleted = await StorageLimitService.autoCleanup(
+          expirationByContentId: expirationByContentId,
+          dir: dirSnapshot.data!,
+        );
+
+        // クリーンアップ後に再チェック
+        final stillExceeded = await StorageLimitService.checkBeforeDownload();
+        if (stillExceeded != null) {
+          // 自動削除しても空きが足りない場合はダイアログで案内
+          if (context.mounted) {
+            await showStorageLimitExceededDialog(
+              context,
+              usage: stillExceeded.usage,
+              limit: stillExceeded.limit,
+            );
+          }
+          return;
+        }
+        // 空きを確保できた場合はスナックバーで通知してダウンロードを続行
+        if (context.mounted && deleted.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${deleted.length}件の古いキャッシュを削除して空き容量を確保しました'),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+
       final path = buildSavePath(dirSnapshot.data!, content, langCode);
       isDownloading.value = true;
       progress.value = 0;
+
+      AnalyticsService.logPdfDownloadStart(
+        contentId: content.id,
+        contentTitle: content.title,
+      );
 
       final isLocal = content.url.startsWith('http://127.0.0.1');
 
@@ -102,14 +162,26 @@ class ContentPreviewCard extends HookConsumerWidget {
           if (!context.mounted) return;
           cancelToken.value = null;
           isDownloading.value = false;
+          // ignore: unawaited_futures
+          StorageLimitService.recordFile(
+              path.split('/').last, File(path).lengthSync(), content.id);
+          AnalyticsService.logPdfDownloadComplete(
+            contentId: content.id,
+            contentTitle: content.title,
+          );
+          // ignore: unawaited_futures
+          ContentUpdateService.saveDownloadTimestamp(content.id, langCode);
           if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
-          context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
         } on DioException catch (e) {
           if (!context.mounted) return;
           cancelToken.value = null;
           if (e.type == DioExceptionType.cancel) {
             isDownloading.value = false;
             progress.value = 0;
+            AnalyticsService.logPdfDownloadCancelled(
+              contentId: content.id,
+              contentTitle: content.title,
+            );
             return;
           }
           // サーバー接続失敗時はバンドルアセットにフォールバック
@@ -123,12 +195,25 @@ class ContentPreviewCard extends HookConsumerWidget {
             if (!context.mounted) return;
             isDownloading.value = false;
             progress.value = 1.0;
+            // ignore: unawaited_futures
+            StorageLimitService.recordFile(
+                path.split('/').last, File(path).lengthSync(), content.id);
+            AnalyticsService.logPdfDownloadComplete(
+              contentId: content.id,
+              contentTitle: content.title,
+            );
+            // ignore: unawaited_futures
+            ContentUpdateService.saveDownloadTimestamp(content.id, langCode);
             if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
-            context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
           } catch (fallbackErr) {
             if (!context.mounted) return;
             isDownloading.value = false;
             progress.value = 0;
+            AnalyticsService.logPdfDownloadFailed(
+              contentId: content.id,
+              contentTitle: content.title,
+              reason: '$fallbackErr',
+            );
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(l10n.downloadFailed('$fallbackErr'))),
             );
@@ -138,6 +223,11 @@ class ContentPreviewCard extends HookConsumerWidget {
           cancelToken.value = null;
           isDownloading.value = false;
           progress.value = 0;
+          AnalyticsService.logPdfDownloadFailed(
+            contentId: content.id,
+            contentTitle: content.title,
+            reason: '$e',
+          );
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(l10n.errorMsg('$e'))),
           );
@@ -167,14 +257,31 @@ class ContentPreviewCard extends HookConsumerWidget {
         switch (result.status) {
           case TaskStatus.complete:
             isDownloading.value = false;
+            // ignore: unawaited_futures
+            StorageLimitService.recordFile(
+                path.split('/').last, File(path).lengthSync(), content.id);
+            AnalyticsService.logPdfDownloadComplete(
+              contentId: content.id,
+              contentTitle: content.title,
+            );
+            // ignore: unawaited_futures
+            ContentUpdateService.saveDownloadTimestamp(content.id, langCode);
             if (dirSnapshot.data != null) checkDownloadStatus(dirSnapshot.data!);
-            context.go('/viewer', extra: ViewerArgs(filePath: path, preventCapture: content.preventCapture));
           case TaskStatus.canceled:
             isDownloading.value = false;
             progress.value = 0;
+            AnalyticsService.logPdfDownloadCancelled(
+              contentId: content.id,
+              contentTitle: content.title,
+            );
           default:
             isDownloading.value = false;
             progress.value = 0;
+            AnalyticsService.logPdfDownloadFailed(
+              contentId: content.id,
+              contentTitle: content.title,
+              reason: '${result.status}',
+            );
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(l10n.downloadFailed('${result.status}'))),
             );
@@ -205,7 +312,14 @@ class ContentPreviewCard extends HookConsumerWidget {
       final path = savedPath.value;
       if (path == null) return;
       final file = File(path);
-      if (await file.exists()) await file.delete();
+      if (await file.exists()) {
+        await StorageLimitService.removeFile(path.split('/').last);
+        await file.delete();
+      }
+      AnalyticsService.logPdfDelete(
+        contentId: content.id,
+        contentTitle: content.title,
+      );
       if (context.mounted) {
         isDownloaded.value = false;
         savedPath.value = null;
@@ -400,6 +514,10 @@ class ContentPreviewCard extends HookConsumerWidget {
                                 onPressed: !isAvailable
                                     ? null
                                     : () async {
+                                        AnalyticsService.logWebContentOpen(
+                                          contentId: content.id,
+                                          contentTitle: content.title,
+                                        );
                                         final browser = ChromeSafariBrowser();
                                         await browser.open(
                                           url: WebUri(content.url),
@@ -458,11 +576,21 @@ class ContentPreviewCard extends HookConsumerWidget {
                                         ? null
                                         : downloaded
                                             ? (path != null
-                                                ? () => context.go('/viewer',
-                                                    extra: ViewerArgs(
-                                                        filePath: path,
-                                                        preventCapture: content
-                                                            .preventCapture))
+                                                ? () {
+                                                    AnalyticsService.logPdfOpen(
+                                                      contentId: content.id,
+                                                      contentTitle: content.title,
+                                                    );
+                                                    // LRU 管理のためアクセス日時を更新
+                                                    StorageLimitService
+                                                        .recordAccess(
+                                                            path.split('/').last);
+                                                    context.push('/viewer',
+                                                        extra: ViewerArgs(
+                                                            filePath: path,
+                                                            preventCapture: content
+                                                                .preventCapture));
+                                                  }
                                                 : null)
                                             : (dirSnapshot.hasData ? download : null),
                                     child: FittedBox(

@@ -12,7 +12,9 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
+import '../../services/analytics_service.dart';
 import '../../services/capture_protection_service.dart';
+import '../../services/pdf_preview_cache.dart';
 
 import '../../controllers/bookmark_controller.dart';
 import '../../controllers/memo_controller.dart';
@@ -64,6 +66,8 @@ class PdfViewerPage extends HookConsumerWidget {
 
     // 現在開いているPDFファイル（null = ファイル未選択）
     final selectedFile = useState<File?>(null);
+    // doc==null（Pdfium初期化中）の間でもキャッシュ画像を即時表示するための先読み
+    final initialPreview = useState<ui.Image?>(null);
     // 総ページ数（0 = 未ロード）
     final pageCount = useState(0);
     // 現在表示中のページ番号（1始まり）
@@ -78,6 +82,8 @@ class PdfViewerPage extends HookConsumerWidget {
     final memos = useState<Map<int, String>>({});
     // AppBar とサムネイルバーの表示/非表示フラグ（タップで切り替え）
     final isUiVisible = useState(true);
+    // 見開き分割モード（true のとき PDF の各ページを左右に分割して表示）
+    final isSplitMode = useState(false);
     // 現在の検索クエリ文字列（ハイライト表示に使用）
     final searchQuery = useState<String>('');
     // キーワード検索のヒット一覧（全ページ分）
@@ -193,10 +199,38 @@ class PdfViewerPage extends HookConsumerWidget {
 
     // コンテンツ一覧からファイルパスが渡された場合に自動でファイルを開く
     useEffect(() {
-      if (initialFilePath != null) {
-        selectedFile.value = File(initialFilePath!);
-      }
-      return null;
+      if (initialFilePath == null) return null;
+      selectedFile.value = File(initialFilePath!);
+
+      // ファイル名をコンテンツIDとして使用（パスの最後のセグメント）
+      final fileName = initialFilePath!.split('/').last;
+      AnalyticsService.logPdfOpen(
+        contentId: fileName,
+        contentTitle: fileName,
+      );
+
+      // ── キャッシュ先読み ────────────────────────────────────────────────
+      // PdfDocumentViewBuilder が doc を返すまで（Pdfium 初期化 = 数秒）、
+      // ディスクキャッシュがあれば即座に表示してユーザーの空白待ちを解消する。
+      var cancelled = false;
+      final cachePath = PdfPreviewCache.cachePath(initialFilePath!, 0);
+      File(cachePath).readAsBytes().then((bytes) async {
+        if (cancelled) return;
+        final codec = await ui.instantiateImageCodec(bytes);
+        final frame = await codec.getNextFrame();
+        if (!cancelled && context.mounted) {
+          initialPreview.value = frame.image;
+        } else {
+          frame.image.dispose();
+        }
+      }).catchError((_) {});
+
+      return () {
+        cancelled = true;
+        // アンマウント中に hook の setter を呼ぶと defunct element への
+        // setState になるため、image の dispose のみ行う。
+        initialPreview.value?.dispose();
+      };
     }, []);
 
     // preventCapture が true のとき OS レベルでキャプチャを抑止する。
@@ -225,11 +259,17 @@ class PdfViewerPage extends HookConsumerWidget {
       return null;
     }, [selectedFile.value?.path]);
 
-    // ファイルが変わるたびに新しいコントローラーを生成してページ 0 にリセット
+    // ファイルまたは分割モードが変わるたびに新しいコントローラーを生成してページ 0 にリセット
     final pageController = useMemoized(
       () => PageController(initialPage: 0),
-      [selectedFile.value],
+      [selectedFile.value, isSplitMode.value],
     );
+
+    // 分割モード切り替え時に現在ページを 1 にリセット
+    useEffect(() {
+      currentPage.value = 1;
+      return null;
+    }, [isSplitMode.value]);
 
     final thumbnailScrollController = useMemoized(() => ScrollController());
 
@@ -477,13 +517,16 @@ class PdfViewerPage extends HookConsumerWidget {
     // 上書きするのを防ぐために使用する。
     final isProgrammaticNav = useRef(false);
 
-    /// 指定ページ番号に移動する（PageView アニメーション付き）。
-    void goToPage(int page) {
+    /// 指定 PDF ページ番号に移動する（PageView アニメーション付き）。
+    /// 分割モードでは左半分（偶数仮想ページ）へ移動する。
+    void goToPage(int pdfPage) {
       isProgrammaticNav.value = true;
-      currentPage.value = page;
+      currentPage.value = pdfPage;
+      final virtualIndex =
+          isSplitMode.value ? (pdfPage - 1) * 2 : pdfPage - 1;
       pageController
           .animateToPage(
-            page - 1,
+            virtualIndex,
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
           )
@@ -706,6 +749,13 @@ class PdfViewerPage extends HookConsumerWidget {
                       key: ValueKey(selectedFile.value!.path),
                       builder: (context, doc) {
                         if (doc == null) {
+                          // キャッシュ先読み済みなら即座に表示、なければスピナー
+                          final preview = initialPreview.value;
+                          if (preview != null) {
+                            return Center(
+                                child: RawImage(
+                                    image: preview, fit: BoxFit.contain));
+                          }
                           return const Center(
                               child: CircularProgressIndicator());
                         }
@@ -719,8 +769,9 @@ class PdfViewerPage extends HookConsumerWidget {
                             final ms = DateTime.now()
                                 .difference(viewerOpenedAt)
                                 .inMilliseconds;
+                            // ── フェーズ1: ドキュメントオープン完了 ──────────────
                             debugPrint(
-                                '[PDF Load] ${(ms / 1000).toStringAsFixed(2)}秒');
+                                '[PDF Phase1] ドキュメントオープン: ${(ms / 1000).toStringAsFixed(2)}秒');
                           });
                         }
                         // 指の本数を追跡して PageView のスワイプを即座に無効化する。
@@ -766,11 +817,23 @@ class PdfViewerPage extends HookConsumerWidget {
                               ? const NeverScrollableScrollPhysics()
                               : const PageScrollPhysics(),
                           allowImplicitScrolling: true,
-                          itemCount: doc.pages.length,
+                          itemCount: isSplitMode.value
+                              ? doc.pages.length * 2
+                              : doc.pages.length,
                           onPageChanged: (index) {
                             // プログラム遷移中は経由ページによる上書きを無視する
                             if (!isProgrammaticNav.value) {
-                              currentPage.value = index + 1;
+                              final page = isSplitMode.value
+                                  ? index ~/ 2 + 1
+                                  : index + 1;
+                              currentPage.value = page;
+                              final filePath = selectedFile.value?.path;
+                              if (filePath != null) {
+                                AnalyticsService.logPdfPageView(
+                                  contentId: filePath.split('/').last,
+                                  pageNumber: page,
+                                );
+                              }
                             }
                             // ページ切り替え時にポインター数をリセット。
                             // 切り替えアニメーション中に pointer cancel が
@@ -778,7 +841,17 @@ class PdfViewerPage extends HookConsumerWidget {
                             pointerCountNotifier.value = 0;
                           },
                           itemBuilder: (context, index) {
-                            return GestureDetector(
+                            // 分割モード: 仮想ページ index を PDF ページと左右半分に分解する
+                            final pdfIndex =
+                                isSplitMode.value ? index ~/ 2 : index;
+                            final showRight =
+                                isSplitMode.value && index.isOdd;
+
+                            // 分割モード: PdfPageView を画面2倍幅のコンテナで
+                            // レンダリングし、左右いずれかの半分だけを表示する。
+                            // decorationBuilder 内でクリップすると pageImage が
+                            // 正しくスケールしないため、外側でラップする方式をとる。
+                            final gesture = GestureDetector(
                               onDoubleTapDown: (details) {
                                 doubleTapPosition.value =
                                     details.localPosition;
@@ -800,13 +873,25 @@ class PdfViewerPage extends HookConsumerWidget {
                               scaleEnabled: true,
                               child: PdfPageView(
                                 document: doc,
-                                pageNumber: index + 1,
-                                maximumDpi: 150,
+                                pageNumber: pdfIndex + 1,
+                                // 分割モードは OverflowBox で2倍幅レンダリングになるため
+                                // 96 DPI に抑えて約2倍の高速化を図る（通常モードは
+                                // ウィジェットサイズで制限されるため変化なし）。
+                                maximumDpi: isSplitMode.value ? 96 : 150,
                                 backgroundColor:
                                     isDark ? Colors.black : Colors.white,
                                 // decorationBuilder: ページ画像の上にオーバーレイを重ねる
                                 decorationBuilder:
                                     (ctx, pageSize, page, pageImage) {
+                                  // ── フェーズ2: ページ描画完了ログ ──────────────────
+                                  if (pageImage != null && page.pageNumber == 1) {
+                                    final ms = DateTime.now()
+                                        .difference(viewerOpenedAt)
+                                        .inMilliseconds;
+                                    debugPrint(
+                                        '[PDF Phase2] ページ1描画完了: ${(ms / 1000).toStringAsFixed(2)}秒');
+                                  }
+
                                   // ダークモード時: ページ画像に色反転フィルターを適用
                                   Widget? image = pageImage;
                                   if (isDark && image != null) {
@@ -815,6 +900,8 @@ class PdfViewerPage extends HookConsumerWidget {
                                       child: image,
                                     );
                                   }
+
+                                  // ── 通常モード ───────────────────────────────────
                                   return Align(
                                     alignment: Alignment.center,
                                     child: AspectRatio(
@@ -844,7 +931,18 @@ class PdfViewerPage extends HookConsumerWidget {
                                                 ),
                                               ),
                                               // PDFページ画像
-                                              if (image != null) image,
+                                              // pageImage が null の間（レンダリング中）は
+                                              // 低解像度プレビューを表示してUXを改善する。
+                                              // プレビューは 400px 幅で高速レンダリングし、
+                                              // フル品質が届いたら自動的に置き換わる。
+                                              if (image != null)
+                                                image
+                                              else
+                                                _PagePreview(
+                                                  page: page,
+                                                  pdfPath: selectedFile.value?.path ?? '',
+                                                  isDark: isDark,
+                                                ),
                                               // 検索ハイライトオーバーレイ
                                               if (searchMatches
                                                   .value.isNotEmpty)
@@ -917,7 +1015,31 @@ class PdfViewerPage extends HookConsumerWidget {
                                 },
                               ),
                             ),   // InteractiveViewer
-                            );   // GestureDetector
+                            );   // gesture (GestureDetector)
+
+                            if (!isSplitMode.value) return gesture;
+
+                            // 分割モード: 画面幅の2倍コンテナでレンダリングし
+                            // 左半分または右半分だけを ClipRect で切り出す。
+                            return LayoutBuilder(
+                              builder: (ctx, constraints) {
+                                final sw = constraints.maxWidth;
+                                final sh = constraints.maxHeight;
+                                return ClipRect(
+                                  child: OverflowBox(
+                                    alignment: showRight
+                                        ? Alignment.centerRight
+                                        : Alignment.centerLeft,
+                                    maxWidth: sw * 2,
+                                    maxHeight: sh,
+                                    child: SizedBox(
+                                      width: sw * 2,
+                                      child: gesture,
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
                           },
                         ),   // PageView.builder
                           ),   // ValueListenableBuilder<int>
@@ -966,9 +1088,22 @@ class PdfViewerPage extends HookConsumerWidget {
                 onMemoTap: pageCount.value > 0
                     ? () => showMemoDialog(currentPage.value)
                     : null,
-                onBack: () => context.go('/'),
+                onBack: () {
+                  final filePath = selectedFile.value?.path;
+                  if (filePath != null) {
+                    AnalyticsService.logPdfClose(
+                      contentId: filePath.split('/').last,
+                      lastPage: currentPage.value,
+                    );
+                  }
+                  context.canPop() ? context.pop() : context.go('/');
+                },
                 ttsStatus: ttsStatus.value,
                 onTtsTap: toggleTts,
+                isSplitMode: isSplitMode.value,
+                onSplitToggle: selectedFile.value != null
+                    ? () => isSplitMode.value = !isSplitMode.value
+                    : null,
               ),
             ),
           ),
@@ -1018,6 +1153,148 @@ class PdfViewerPage extends HookConsumerWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// PDFページのレンダリング完了前に表示するプレビューウィジェット。
+///
+/// 表示優先度：
+/// 1. ディスクキャッシュ（2回目以降は < 100ms で表示）
+/// 2. 400px 幅のオンデマンドレンダリング（初回のみ 1〜3 秒）
+///
+/// レンダリング後は PNG をディスクに保存し次回起動時も即座に表示できる。
+/// フル品質の [pageImage] が届くと親の `decorationBuilder` 側でこのウィジェットが
+/// ツリーから外れ、`dispose()` で `ui.Image` を解放する。
+class _PagePreview extends StatefulWidget {
+  const _PagePreview({
+    required this.page,
+    required this.pdfPath,
+    required this.isDark,
+  });
+
+  final PdfPage page;
+  /// キャッシュファイルの生成に使うPDFのローカルパス。空文字の場合はキャッシュをスキップ。
+  final String pdfPath;
+  final bool isDark;
+
+  @override
+  State<_PagePreview> createState() => _PagePreviewState();
+}
+
+class _PagePreviewState extends State<_PagePreview> {
+  ui.Image? _preview;
+
+  @override
+  void initState() {
+    super.initState();
+    _renderPreview();
+  }
+
+  @override
+  void didUpdateWidget(_PagePreview old) {
+    super.didUpdateWidget(old);
+    if (old.page.pageNumber != widget.page.pageNumber ||
+        old.pdfPath != widget.pdfPath) {
+      _preview?.dispose();
+      setState(() => _preview = null);
+      _renderPreview();
+    }
+  }
+
+  String get _cachePath =>
+      PdfPreviewCache.cachePath(widget.pdfPath, widget.page.pageNumber - 1);
+
+  Future<void> _renderPreview() async {
+    final t0 = DateTime.now();
+    final label = 'p${widget.page.pageNumber}';
+
+    // ── 1. ディスクキャッシュ確認（2回目以降は < 100ms）─────────────────────
+    if (widget.pdfPath.isNotEmpty) {
+      try {
+        final cacheFile = File(_cachePath);
+        if (await cacheFile.exists()) {
+          final bytes = await cacheFile.readAsBytes();
+          final codec = await ui.instantiateImageCodec(bytes);
+          final frame = await codec.getNextFrame();
+          if (mounted) setState(() => _preview = frame.image);
+          debugPrint('[PDF Preview] $label キャッシュヒット: ${DateTime.now().difference(t0).inMilliseconds}ms');
+          return;
+        }
+      } catch (_) {}
+    }
+
+    // ── 2. ネイティブサムネイル API（iOS: PDFPage.thumbnail / Android: PdfRenderer）
+    if (widget.pdfPath.isNotEmpty) {
+      debugPrint('[PDF Preview] $label ネイティブThumbnail呼び出し開始');
+      final nativeBytes = await PdfPreviewCache.fetchNativeThumbnail(
+        widget.pdfPath, widget.page.pageNumber - 1);
+      if (nativeBytes != null) {
+        try {
+          final codec = await ui.instantiateImageCodec(nativeBytes);
+          final frame = await codec.getNextFrame();
+          final img = frame.image;
+          if (mounted) setState(() => _preview = img);
+          debugPrint('[PDF Preview] $label ネイティブThumbnail完了: ${DateTime.now().difference(t0).inMilliseconds}ms (${nativeBytes.length}bytes)');
+          File(_cachePath).writeAsBytes(nativeBytes).catchError((_) => File(_cachePath));
+          return;
+        } catch (_) {}
+      } else {
+        debugPrint('[PDF Preview] $label ネイティブThumbnailがnullを返した（失敗）');
+      }
+    }
+
+    // ── 3. pdfrx レンダリング（フォールバック）─────────────────────────────
+    debugPrint('[PDF Preview] $label pdfrx render開始');
+    final page = widget.page;
+    const previewWidth = 400;
+    final previewHeight = (previewWidth * page.height / page.width).toInt();
+    try {
+      final pdfImg = await page.render(width: previewWidth, height: previewHeight);
+      if (pdfImg == null) return;
+      final img = await pdfImg.createImage();
+      pdfImg.dispose();
+      if (mounted) {
+        setState(() => _preview = img);
+      } else {
+        img.dispose();
+        return;
+      }
+      debugPrint('[PDF Preview] $label pdfrx render完了: ${DateTime.now().difference(t0).inMilliseconds}ms');
+      if (widget.pdfPath.isNotEmpty) _saveImageToCache(img, _cachePath);
+    } catch (e) {
+      debugPrint('[PDF Preview] $label pdfrx render失敗: $e');
+    }
+  }
+
+  static Future<void> _saveImageToCache(ui.Image img, String path) async {
+    try {
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData != null) {
+        await File(path).writeAsBytes(byteData.buffer.asUint8List());
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _preview?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = _preview;
+    if (preview == null) {
+      return Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: widget.isDark ? Colors.white38 : Colors.black26,
+        ),
+      );
+    }
+    return SizedBox.expand(
+      child: RawImage(image: preview, fit: BoxFit.contain),
     );
   }
 }

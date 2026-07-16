@@ -1,6 +1,6 @@
 name: pdf_app
 description: PDFアプリ
-version: 1.0.0
+version: 1.0.2+4
 publish_to: none
 
 environment:
@@ -36,8 +36,13 @@ dependencies:
   background_downloader: ^9.0.0
   screen_protector: ^1.5.2
 
+  # ローカルPush通知
+  flutter_local_notifications: '>=16.3.0 <17.0.0'
+  timezone: ^0.9.4
+
   # Firebase
   firebase_core: ^2.27.0
+  firebase_analytics: ^10.10.0
 
   # WebView
   flutter_inappwebview: ^6.1.5
@@ -89,6 +94,8 @@ flutter:
     - assets/pickup_carlease.jpg
     - assets/pickup_okamoto_sanbashi.jpg
     - assets/jalshop_catalog.png
+    - assets/banner_zennoh_chicken.png
+    - assets/torimeshi_kagoshima.png
 
 flutter_launcher_icons:
   android: true
