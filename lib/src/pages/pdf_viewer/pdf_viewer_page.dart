@@ -14,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
 import '../../services/analytics_service.dart';
 import '../../services/capture_protection_service.dart';
+import '../../services/pdf_document_cache.dart';
 import '../../services/pdf_preview_cache.dart';
 
 import '../../controllers/bookmark_controller.dart';
@@ -98,6 +99,12 @@ class PdfViewerPage extends HookConsumerWidget {
     final ttsHighlightEnd = useState<int?>(null);
     // TTS 読み上げ中ページのテキストキャッシュ（ハイライト座標変換に使用）
     final ttsPageText = useState<PdfPageText?>(null);
+    // TTS の speakText 内位置 → pageText.fullText 内位置マッピング
+    final ttsFragMap = useState<List<({int speakOff, int origOff, int len})>>([]);
+    // OCR パス用ハイライトデータ（normalizedRect は [0,1] 正規化座標、画像左上原点）
+    final ttsOcrBlocks = useState<List<({String text, Rect normalizedRect})>>([]);
+    // OCR 読み上げ中の現在ブロックインデックス（null = 非ハイライト）
+    final ttsOcrHighlightIdx = useState<int?>(null);
 
     // ピンチズーム用コントローラー。
     // 倍率を監視して PageView のスワイプと干渉しないよう制御する。
@@ -181,6 +188,9 @@ class PdfViewerPage extends HookConsumerWidget {
         ttsHighlightStart.value = null;
         ttsHighlightEnd.value = null;
         ttsPageText.value = null;
+        ttsFragMap.value = [];
+        ttsOcrBlocks.value = [];
+        ttsOcrHighlightIdx.value = null;
       }
       // キャンセル・エラー時のフォールバックリセット
       // （completionHandler と progressHandler はセッションごとに toggleTts で登録する）
@@ -301,6 +311,9 @@ class PdfViewerPage extends HookConsumerWidget {
         ttsHighlightStart.value = null;
         ttsHighlightEnd.value = null;
         ttsPageText.value = null;
+        ttsFragMap.value = [];
+        ttsOcrBlocks.value = [];
+        ttsOcrHighlightIdx.value = null;
       }
       return null;
     }, [currentPage.value]);
@@ -336,6 +349,8 @@ class PdfViewerPage extends HookConsumerWidget {
         ttsHighlightStart.value = null;
         ttsHighlightEnd.value = null;
         ttsPageText.value = null;
+        ttsOcrBlocks.value = [];
+        ttsOcrHighlightIdx.value = null;
         return;
       }
 
@@ -360,34 +375,43 @@ class PdfViewerPage extends HookConsumerWidget {
           // フラグメントを座標でソートして視覚的な読み順に並べ直す
           usedOcr = false;
           ttsPageText.value = pageText;
-          speakText = _extractTtsText(pageText);
+          final (extractedText, fragMap) = _buildTtsTextWithMap(pageText);
+          speakText = extractedText;
+          ttsFragMap.value = fragMap;
         } else {
-          // テキスト層なし → iOS は PDFKit でテキスト抽出を試みる
-          usedOcr = false;
+          // テキスト層なし → OCR でテキストと座標を同時に取得する。
+          // PDFKit はテキストを返すが座標（バウンディングボックス）を持たないため、
+          // progressHandler でハイライト位置を特定できない（iOS 固有の不具合）。
+          // OCR（iOS: Vision Framework）はテキストと座標の両方を返すため常に利用する。
+          usedOcr = true;
           speakText = '';
           final filePath = selectedFile.value?.path;
-          if (filePath != null && Platform.isIOS) {
-            const _kPdfChannel = MethodChannel('app.tts.pdf');
-            try {
-              final pdfKitText = await _kPdfChannel.invokeMethod<String>(
-                    'extractText',
-                    {'filePath': filePath, 'pageIndex': currentPage.value - 1},
-                  ) ?? '';
-              debugPrint('[TTS] PDFKit result length=${pdfKitText.length}');
-              if (pdfKitText.trim().isNotEmpty) {
-                speakText = pdfKitText.trim();
-              }
-            } catch (e) {
-              debugPrint('[TTS] PDFKit error: $e');
-            }
+          if (filePath != null) {
+            final ocrResult = await _extractTextByOcr(filePath, currentPage.value - 1, langCode);
+            speakText = ocrResult.text;
+            ttsOcrBlocks.value = ocrResult.blocks;
+            debugPrint('[TTS] OCR result length=${speakText.length}, blocks=${ocrResult.blocks.length}');
           }
-          // PDFKit でも取得できなければ OCR フォールバック
-          if (speakText.isEmpty) {
-            usedOcr = true;
+          // OCR でもテキストが取得できない場合、iOS では PDFKit を最終手段として試みる
+          // （この場合はハイライトなしで読み上げのみ）
+          if (speakText.isEmpty && Platform.isIOS) {
+            final filePath = selectedFile.value?.path;
             if (filePath != null) {
-              speakText = await _extractTextByOcr(filePath, currentPage.value - 1, langCode);
+              const _kPdfChannel = MethodChannel('app.tts.pdf');
+              try {
+                final pdfKitText = await _kPdfChannel.invokeMethod<String>(
+                      'extractText',
+                      {'filePath': filePath, 'pageIndex': currentPage.value - 1},
+                    ) ?? '';
+                debugPrint('[TTS] PDFKit fallback length=${pdfKitText.length}');
+                if (pdfKitText.trim().isNotEmpty) {
+                  speakText = pdfKitText.trim();
+                  usedOcr = false;
+                }
+              } catch (e) {
+                debugPrint('[TTS] PDFKit error: $e');
+              }
             }
-            debugPrint('[TTS] OCR result length=${speakText.length}');
           }
         }
 
@@ -408,13 +432,15 @@ class PdfViewerPage extends HookConsumerWidget {
           final filePath = selectedFile.value?.path;
           if (filePath != null) {
             debugPrint('[TTS] native text has no Japanese (ToUnicode missing?), trying OCR fallback');
-            final ocrText = await _extractTextByOcr(
+            final ocrResult = await _extractTextByOcr(
                 filePath, currentPage.value - 1, langCode);
-            debugPrint('[TTS] OCR fallback length=${ocrText.length}');
-            if (ocrText.isNotEmpty) {
-              speakText = ocrText;
+            debugPrint('[TTS] OCR fallback length=${ocrResult.text.length}, blocks=${ocrResult.blocks.length}');
+            if (ocrResult.text.isNotEmpty) {
+              speakText = ocrResult.text;
               usedOcr = true;
-              ttsPageText.value = null; // OCRパスではハイライト不可
+              ttsPageText.value = null;
+              ttsFragMap.value = [];
+              ttsOcrBlocks.value = ocrResult.blocks;
             }
           }
         }
@@ -485,30 +511,65 @@ class PdfViewerPage extends HookConsumerWidget {
           chunkIndex++;
           if (chunkIndex < chunks.length &&
               ttsStatus.value == TtsStatus.speaking) {
-            tts.speak(chunks[chunkIndex]);
+            tts.speak(chunks[chunkIndex].text);
           } else {
             ttsStatus.value = TtsStatus.idle;
             ttsHighlightStart.value = null;
             ttsHighlightEnd.value = null;
             ttsPageText.value = null;
+            ttsFragMap.value = [];
+            ttsOcrBlocks.value = [];
+            ttsOcrHighlightIdx.value = null;
           }
         });
 
-        // ハイライトは先頭チャンクのみ有効（チャンク境界でインデックスがリセットされるため）
         tts.setProgressHandler((text, start, end, word) {
-          if (!context.mounted || ttsPageText.value == null) return;
-          if (chunkIndex == 0) {
-            ttsHighlightStart.value = start;
-            ttsHighlightEnd.value = end;
+          if (!context.mounted) return;
+
+          // ── ネイティブテキストパス ─────────────────────────────────────────
+          if (ttsPageText.value != null) {
+            final fm = ttsFragMap.value;
+            if (fm.isEmpty) return;
+            final pt = ttsPageText.value!;
+            final searchWord = word.trim();
+            if (searchWord.isEmpty) return;
+            final speakPos = chunks[chunkIndex].start + start;
+            final approxPos = _mapSpeakToOrig(fm, speakPos);
+            final searchFrom = (approxPos - 150).clamp(0, pt.fullText.length);
+            int idx = pt.fullText.indexOf(searchWord, searchFrom);
+            if (idx < 0) idx = pt.fullText.indexOf(searchWord);
+            debugPrint('[TTS highlight] word="$searchWord" approxPos=$approxPos idx=$idx');
+            if (idx >= 0) {
+              ttsHighlightStart.value = idx;
+              ttsHighlightEnd.value   = idx + searchWord.length;
+            }
+            return;
+          }
+
+          // ── OCR パス: OCR ブロックのバウンディングボックスでハイライト ────────
+          final blocks = ttsOcrBlocks.value;
+          if (blocks.isEmpty) return;
+          final speakPos = chunks[chunkIndex].start + start;
+          var pos = 0;
+          for (var i = 0; i < blocks.length; i++) {
+            final blockEnd = pos + blocks[i].text.length;
+            if (speakPos >= pos && speakPos < blockEnd) {
+              debugPrint('[TTS OCR highlight] block=$i word="$word" speakPos=$speakPos');
+              ttsOcrHighlightIdx.value = i;
+              break;
+            }
+            pos += blocks[i].text.length + 1; // '\n' セパレータ分
           }
         });
 
         ttsStatus.value = TtsStatus.speaking;
-        await tts.speak(chunks[0]);
+        await tts.speak(chunks[0].text);
       } catch (e, st) {
         debugPrint('[TTS] error: $e\n$st');
         ttsStatus.value = TtsStatus.idle;
         ttsPageText.value = null;
+        ttsOcrBlocks.value = [];
+        ttsOcrHighlightIdx.value = null;
       }
     }
 
@@ -744,9 +805,17 @@ class PdfViewerPage extends HookConsumerWidget {
                       tapDownPos.value  = null;
                     },
                     child: SelectionArea(
-                    child: PdfDocumentViewBuilder.file(
-                      selectedFile.value!.path,
-                      key: ValueKey(selectedFile.value!.path),
+                    child: Builder(builder: (context) {
+                    // キャッシュ済みドキュメントがあれば PdfDocumentRefDirect で即時表示、
+                    // なければ通常の PdfDocumentRefFile でロードする。
+                    final filePath = selectedFile.value!.path;
+                    final cachedDoc = PdfDocumentCache.get(filePath);
+                    final docRef = cachedDoc != null
+                        ? PdfDocumentRefDirect(cachedDoc, autoDispose: false)
+                        : PdfDocumentRefFile(filePath);
+                    return PdfDocumentViewBuilder(
+                      key: ValueKey(filePath),
+                      documentRef: docRef,
                       builder: (context, doc) {
                         if (doc == null) {
                           // キャッシュ先読み済みなら即座に表示、なければスピナー
@@ -891,6 +960,12 @@ class PdfViewerPage extends HookConsumerWidget {
                                     debugPrint(
                                         '[PDF Phase2] ページ1描画完了: ${(ms / 1000).toStringAsFixed(2)}秒');
                                   }
+                                  // 診断: decorationBuilder の pageSize と PDF ネイティブサイズ
+                                  if (page.pageNumber == currentPage.value &&
+                                      ttsOcrBlocks.value.isNotEmpty) {
+                                    debugPrint('[DECOR_SIZE] pageSize=${pageSize.width.toStringAsFixed(1)}x${pageSize.height.toStringAsFixed(1)} '
+                                        'page.native=${page.width.toStringAsFixed(1)}x${page.height.toStringAsFixed(1)}');
+                                  }
 
                                   // ダークモード時: ページ画像に色反転フィルターを適用
                                   Widget? image = pageImage;
@@ -966,7 +1041,7 @@ class PdfViewerPage extends HookConsumerWidget {
                                                     activeMatch: activeMatch,
                                                   );
                                                 }),
-                                              // TTS 読み上げ中の現在単語ハイライト
+                                              // TTS 読み上げ中の現在単語ハイライト（ネイティブテキストパス）
                                               if (ttsHighlightStart.value != null &&
                                                   ttsHighlightEnd.value != null &&
                                                   ttsPageText.value != null &&
@@ -978,6 +1053,46 @@ class PdfViewerPage extends HookConsumerWidget {
                                                   charStart: ttsHighlightStart.value!,
                                                   charEnd: ttsHighlightEnd.value!,
                                                 ),
+                                              // TTS 読み上げ中の現在行ハイライト（OCR パス）
+                                              // normalizedRect（[0,1]）を size にスケールして配置。
+                                              if (ttsOcrHighlightIdx.value != null &&
+                                                  ttsOcrBlocks.value.isNotEmpty &&
+                                                  page.pageNumber == currentPage.value)
+                                                Builder(builder: (_) {
+                                                  final idx = ttsOcrHighlightIdx.value!;
+                                                  if (idx >= ttsOcrBlocks.value.length) {
+                                                    return const SizedBox.shrink();
+                                                  }
+                                                  final r = ttsOcrBlocks.value[idx].normalizedRect;
+                                                  final markerLeft = r.left * size.width;
+                                                  final markerTop = r.top * size.height;
+                                                  // OCR バウンディングボックスは文字のコア部分のみを含むため
+                                                  // 高さが極端に小さくなる場合がある。視認性のため最低高を確保する。
+                                                  final markerW = ((r.right - r.left) * size.width).clamp(10.0, size.width);
+                                                  final rawH = (r.bottom - r.top) * size.height;
+                                                  // OCR の bbox は文字コア部分のみのため高さが小さい。最低 12px を保証する。
+                                                  final markerH = rawH.clamp(12.0, size.height * 0.12);
+                                                  debugPrint('[TTS OCR overlay] idx=$idx '
+                                                      'normRect=(${r.left.toStringAsFixed(3)},'
+                                                      '${r.top.toStringAsFixed(3)},'
+                                                      '${r.right.toStringAsFixed(3)},'
+                                                      '${r.bottom.toStringAsFixed(3)}) '
+                                                      'px=(${markerLeft.toStringAsFixed(1)},'
+                                                      '${markerTop.toStringAsFixed(1)},'
+                                                      '${markerW.toStringAsFixed(1)}x${markerH.toStringAsFixed(1)}) '
+                                                      'size=${size.width.toInt()}x${size.height.toInt()}');
+                                                  return Stack(children: [
+                                                    Positioned(
+                                                      left: markerLeft,
+                                                      top: markerTop,
+                                                      width: markerW,
+                                                      height: markerH,
+                                                      child: Container(
+                                                        color: Colors.yellow.withValues(alpha: 0.5),
+                                                      ),
+                                                    ),
+                                                  ]);
+                                                }),
                                               // テキスト選択オーバーレイ
                                               // ロングプレスで文字選択、コンテキストメニューからコピー可能
                                               PdfPageTextOverlay(
@@ -1046,8 +1161,9 @@ class PdfViewerPage extends HookConsumerWidget {
                           ),   // ValueListenableBuilder<bool>
                         );   // Listener
                       },
-                    ),
-                  ),
+                    );    // PdfDocumentViewBuilder (return stmt)
+                    }),   // Builder
+                  ),      // SelectionArea
                   ),
           ),
 
@@ -1299,74 +1415,108 @@ class _PagePreviewState extends State<_PagePreview> {
   }
 }
 
-/// PDF のテキストフラグメントを視覚的な読み順（上→下・左→右）にソートして結合する。
+/// PDFのテキストフラグメントを視覚的な読み順（上→下・左→右）にソートしてテキストと
+/// ハイライト用位置マッピングを同時に構築する。
 ///
-/// pdfrx の [PdfPageText.fullText] はフラグメントを PDF 内部順（オブジェクト登録順）で
-/// 連結するため、複数カラムや複雑レイアウトでは視覚的な読み順と一致しない。
-/// フラグメントの [PdfRect] を使って座標ソートすることで読み順を修正する。
-///
-/// pdfrx の [PdfRect] は PDF 座標系（Y 上向き）なので top > bottom。
-/// 視覚的に上にある要素ほど top が大きいため、top **降順** → left 昇順でソートする。
-String _extractTtsText(PdfPageText pageText) {
-  final frags = List.of(pageText.fragments);
-  frags.sort((a, b) {
-    final aTop = a.bounds.top;
-    final bTop = b.bounds.top;
-    // 4pt 以内の差は同一行とみなして左→右順にする
-    if ((aTop - bTop).abs() > 4) {
-      return bTop.compareTo(aTop); // 降順（上の要素が先）
-    }
-    return a.bounds.left.compareTo(b.bounds.left);
-  });
-
-  final buf = StringBuffer();
-  for (final f in frags) {
-    buf.write(f.text);
+/// 返り値: (speakText, fragMap)
+/// fragMap の各エントリは「ソート後テキスト内オフセット speakOff → pageText.fullText
+/// 内オフセット origOff、長さ len」のマッピング。
+/// setProgressHandler が返す文字位置 (speakText 内) を _mapSpeakToOrig で
+/// pageText.fullText 内位置に変換することで正確なハイライト座標が得られる。
+(String, List<({int speakOff, int origOff, int len})>) _buildTtsTextWithMap(
+    PdfPageText pageText) {
+  // 各フラグメントの pageText.fullText 内の開始位置を計算
+  final origOffsets = <int>[];
+  var off = 0;
+  for (final f in pageText.fragments) {
+    origOffsets.add(off);
+    off += f.text.length;
   }
 
-  return buf.toString()
-      // リガチャを基本文字に展開（合字が音声合成エンジンに渡ると読み飛ばされる場合がある）
+  // フラグメントを視覚的な読み順（PDF 座標系: top 降順 → left 昇順）でソート
+  final sortedIdx = List.generate(pageText.fragments.length, (i) => i);
+  sortedIdx.sort((i, j) {
+    final aTop = pageText.fragments[i].bounds.top;
+    final bTop = pageText.fragments[j].bounds.top;
+    if ((aTop - bTop).abs() > 4) return bTop.compareTo(aTop);
+    return pageText.fragments[i].bounds.left
+        .compareTo(pageText.fragments[j].bounds.left);
+  });
+
+  // ソート後テキストを構築しつつ、フラグメントごとの位置マッピングを記録
+  final buf = StringBuffer();
+  final fragMap = <({int speakOff, int origOff, int len})>[];
+  var speakOff = 0;
+  for (final i in sortedIdx) {
+    final frag = pageText.fragments[i];
+    fragMap.add((speakOff: speakOff, origOff: origOffsets[i], len: frag.text.length));
+    buf.write(frag.text);
+    speakOff += frag.text.length;
+  }
+
+  final speakText = buf.toString()
       .replaceAll('ﬁ', 'fi')
       .replaceAll('ﬂ', 'fl')
       .replaceAll('ﬀ', 'ff')
       .replaceAll('ﬃ', 'ffi')
       .replaceAll('ﬄ', 'ffl')
-      // 印刷用制御文字の除去（改行・タブ以外の非印刷可能文字）
       .replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]'), '')
-      // 連続する空白・タブを1スペースに圧縮
       .replaceAll(RegExp(r'[ \t]+'), ' ')
-      // 3行以上の連続改行を2行に圧縮
       .replaceAll(RegExp(r'\n{3,}'), '\n\n')
       .trim();
+
+  return (speakText, fragMap);
+}
+
+/// speakText 内の文字位置を pageText.fullText 内の文字位置に変換する。
+/// fragMap は _buildTtsTextWithMap が返すマッピングリスト（speakOff 昇順ソート済み）。
+int _mapSpeakToOrig(
+    List<({int speakOff, int origOff, int len})> fragMap, int speakPos) {
+  if (fragMap.isEmpty || speakPos < 0) return 0;
+  var lo = 0;
+  var hi = fragMap.length - 1;
+  while (lo < hi) {
+    final mid = (lo + hi + 1) ~/ 2;
+    if (fragMap[mid].speakOff <= speakPos) { lo = mid; } else { hi = mid - 1; }
+  }
+  final entry = fragMap[lo];
+  return entry.origOff + (speakPos - entry.speakOff).clamp(0, entry.len);
 }
 
 /// テキストを読み上げ可能なチャンクに分割する。
+/// 各チャンクの speakText 内での開始位置も返す（全チャンクでのハイライト対応に必要）。
 ///
 /// iOS の AVSpeechSynthesizer は一度に処理できる文字数に上限があり、
 /// 長文を渡すと途中で無音停止する。文末記号で区切ることで自然な区切りにする。
-List<String> _buildTtsChunks(String text, {int maxLen = 2000}) {
-  if (text.length <= maxLen) return [text];
-  final chunks = <String>[];
-  var start = 0;
-  while (start < text.length) {
-    var end = (start + maxLen).clamp(0, text.length);
+List<({String text, int start})> _buildTtsChunks(String text, {int maxLen = 2000}) {
+  if (text.length <= maxLen) return [(text: text, start: 0)];
+  final chunks = <({String text, int start})>[];
+  var pos = 0;
+  while (pos < text.length) {
+    var end = (pos + maxLen).clamp(0, text.length);
     if (end < text.length) {
-      // 文末記号（句点・感嘆符・疑問符・改行）で切ることで文中断を防ぐ
       final cut = text.lastIndexOf(RegExp(r'[。！？\n.!?]'), end);
-      if (cut > start + maxLen ~/ 3) end = cut + 1;
+      if (cut > pos + maxLen ~/ 3) end = cut + 1;
     }
-    final chunk = text.substring(start, end).trim();
-    if (chunk.isNotEmpty) chunks.add(chunk);
-    start = end;
+    final chunk = text.substring(pos, end).trim();
+    if (chunk.isNotEmpty) chunks.add((text: chunk, start: pos));
+    pos = end;
   }
-  return chunks.isEmpty ? [text] : chunks;
+  return chunks.isEmpty ? [(text: text, start: 0)] : chunks;
 }
 
 /// PDF ページを画像レンダリングして ML Kit OCR でテキストを抽出する。
 /// テキスト層を持たない画像型 PDF に対するフォールバック処理。
 /// ビューアーと独立した PdfDocument インスタンスを使うため render() が確実に動作する。
-Future<String> _extractTextByOcr(
-    String filePath, int pageIndex, String langCode) async {
+///
+/// 返値: ({text, blocks})
+///   blocks.normalizedRect は OCR 画像に対する [0,1] 正規化座標（左上原点）。
+///   pdfrx の render() はラスター画像として Y=0 を上端で出力するため、
+///   Flutter の画面座標系と同じ向きになり、そのままスケールして配置できる。
+Future<({String text, List<({String text, Rect normalizedRect})> blocks})>
+    _extractTextByOcr(String filePath, int pageIndex, String langCode) async {
+  const _empty = (text: '', blocks: <({String text, Rect normalizedRect})>[]);
+
   // ビューアーのdocとは別インスタンスでPDFを開く（render競合を回避）
   final doc = await PdfDocument.openFile(filePath);
   try {
@@ -1375,39 +1525,59 @@ Future<String> _extractTextByOcr(
     const _kOcrScale = 6.0;
     final w = (page.width * _kOcrScale).toInt();
     final h = (page.height * _kOcrScale).toInt();
-    debugPrint('[OCR] render size=$w x $h');
-    final pdfImage = await page.render(width: w, height: h);
+    debugPrint('[OCR] render size=${w}x${h}, page=${page.width.toStringAsFixed(1)}x${page.height.toStringAsFixed(1)}pt');
+    // fullWidth/fullHeight を明示することで PDF コンテンツが w×h ピクセル全体に
+    // レンダリングされる。省略すると pdfrx が page.width (72DPI=595pt) をデフォルトとして
+    // 使用し、コンテンツが左上の 595×842 領域にのみ描画されてしまう。
+    final pdfImage = await page.render(fullWidth: w.toDouble(), fullHeight: h.toDouble());
     debugPrint('[OCR] pdfImage=${pdfImage == null ? "null" : "${pdfImage.width}x${pdfImage.height}"}');
-    if (pdfImage == null) return '';
+    if (pdfImage == null) return _empty;
+    // w/h（fullWidth/fullHeight として渡した値）で正規化する。
     try {
       final uiImage = await pdfImage.createImage();
       final byteData =
           await uiImage.toByteData(format: ui.ImageByteFormat.png);
       debugPrint('[OCR] byteData=${byteData == null ? "null" : "${byteData.lengthInBytes} bytes"}');
-      if (byteData == null) return '';
+      if (byteData == null) return _empty;
 
       final tempDir = await getTemporaryDirectory();
       final tempFile = File('${tempDir.path}/tts_ocr_page.png');
       await tempFile.writeAsBytes(byteData.buffer.asUint8List());
 
       if (Platform.isIOS) {
-        // ML Kit iOS は日本語 OCR 精度が低いため、Apple Vision Framework を使用する
+        // ML Kit iOS は日本語 OCR 精度が低いため、Apple Vision Framework を使用する。
+        // AppDelegate.recognizeText が [{text, left, top, right, bottom}] を返す。
+        // Swift 側で Y 反転済み（左上原点、[0,1] 正規化座標）なのでそのまま使用。
         const _kVisionChannel = MethodChannel('app.tts.ocr');
         try {
-          final text = await _kVisionChannel.invokeMethod<String>(
-                'recognizeText',
-                {'imagePath': tempFile.path},
-              ) ??
-              '';
-          debugPrint('[OCR] Vision result length=${text.length}');
-          return text;
+          final rawBlocks = await _kVisionChannel.invokeMethod<List>(
+            'recognizeText',
+            {'imagePath': tempFile.path},
+          );
+          if (rawBlocks == null || rawBlocks.isEmpty) return _empty;
+          final ocrBlocks = rawBlocks.cast<Map>().map((m) {
+            final blockText = m['text'] as String? ?? '';
+            // Swift からは Flutter 慣行の正規化座標（左上原点 [0,1]）で届く
+            final rect = Rect.fromLTRB(
+              (m['left']   as num? ?? 0).toDouble(),
+              (m['top']    as num? ?? 0).toDouble(),
+              (m['right']  as num? ?? 0).toDouble(),
+              (m['bottom'] as num? ?? 0).toDouble(),
+            );
+            return (text: blockText, normalizedRect: rect);
+          }).toList();
+          final joinedText = ocrBlocks.map((b) => b.text).join('\n');
+          debugPrint('[OCR] Vision lines=${ocrBlocks.length}, text=${joinedText.length}chars');
+          return (text: joinedText, blocks: ocrBlocks);
         } catch (e) {
           debugPrint('[OCR] Vision error: $e');
-          return '';
+          return _empty;
         }
       }
 
-      // Android: ML Kit を使用
+      // Android: ML Kit を使用。TextLine（行単位）でハイライト精度を向上。
+      // render() はラスター座標系（Y=0 が上端）で出力するため、
+      // 正規化した値をそのまま Flutter 座標に適用できる（Y 反転不要）。
       final script = langCode == 'ja'
           ? TextRecognitionScript.japanese
           : TextRecognitionScript.latin;
@@ -1418,10 +1588,31 @@ Future<String> _extractTextByOcr(
           InputImage.fromFilePath(tempFile.path),
         );
         debugPrint('[OCR] blocks=${result.blocks.length}');
-        // ブロックを上から下の順に並べて結合
-        final blocks = result.blocks
+        // TextBlock を上から下にソートし、各 TextLine を行単位でリスト化
+        final sortedBlocks = result.blocks
           ..sort((a, b) => a.boundingBox.top.compareTo(b.boundingBox.top));
-        return blocks.map((b) => b.text).join('\n');
+        final ocrBlocks = <({String text, Rect normalizedRect})>[];
+        for (final block in sortedBlocks) {
+          final sortedLines = block.lines
+            ..sort((a, b) => a.boundingBox.top.compareTo(b.boundingBox.top));
+          for (final line in sortedLines) {
+            final bb = line.boundingBox;
+            // 画像ピクセル座標を [0,1] に正規化（render() に渡した w/h で割る）
+            final rect = Rect.fromLTRB(
+              bb.left   / w,
+              bb.top    / h,
+              bb.right  / w,
+              bb.bottom / h,
+            );
+            ocrBlocks.add((text: line.text, normalizedRect: rect));
+            debugPrint('[OCR] line="${line.text.substring(0, line.text.length.clamp(0, 20))}" '
+                'norm=(${rect.left.toStringAsFixed(3)},${rect.top.toStringAsFixed(3)},'
+                '${rect.right.toStringAsFixed(3)},${rect.bottom.toStringAsFixed(3)})');
+          }
+        }
+        final joinedText = ocrBlocks.map((b) => b.text).join('\n');
+        debugPrint('[OCR] lines=${ocrBlocks.length}, text=${joinedText.length}chars');
+        return (text: joinedText, blocks: ocrBlocks);
       } finally {
         await recognizer.close();
       }

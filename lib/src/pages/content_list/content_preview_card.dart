@@ -18,6 +18,7 @@ import '../../services/storage_limit_service.dart';
 import 'storage_limit_dialog.dart';
 import '../../services/analytics_service.dart';
 import '../../services/content_update_service.dart';
+import '../../services/pdf_document_cache.dart';
 import '../../services/pdf_preview_cache.dart';
 
 /// PDFの1ページ目サムネイルを大きく表示するグリッド用カードウィジェット。
@@ -83,12 +84,14 @@ class ContentPreviewCard extends HookConsumerWidget {
       return null;
     }, [dirSnapshot.data]);
 
-    // ダウンロード済みPDFの1ページ目をバックグラウンドでキャッシュ生成する。
-    // 「開く」タップ時に < 100ms で表示できるよう事前レンダリングしておく。
+    // ダウンロード済みPDFを事前にPdfiumで開いておき、ビューア起動を高速化する。
+    // PdfPreviewCache: サムネイルJPEG生成（ビューア起動直後の空白を埋める）
+    // PdfDocumentCache: Pdfiumドキュメントを事前オープン（ビューアのロード待ちをゼロにする）
     useEffect(() {
       final filePath = savedPath.value;
       if (filePath == null) return null;
       PdfPreviewCache.warmUp(filePath); // ignore: unawaited_futures
+      PdfDocumentCache.warmUp(filePath); // ignore: unawaited_futures
       return null;
     }, [savedPath.value]);
 
@@ -313,6 +316,7 @@ class ContentPreviewCard extends HookConsumerWidget {
       if (path == null) return;
       final file = File(path);
       if (await file.exists()) {
+        PdfDocumentCache.evict(path);
         await StorageLimitService.removeFile(path.split('/').last);
         await file.delete();
       }

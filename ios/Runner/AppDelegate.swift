@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import UserNotifications
 import Vision
 import PDFKit
 
@@ -9,6 +10,12 @@ import PDFKit
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // flutter_local_notifications がフォアグラウンドで willPresentNotification を呼ばれるために必要。
+    // FlutterAppDelegate は FlutterAppLifeCycleProvider 経由で UNUserNotificationCenterDelegate を
+    // 実装しており、登録済みプラグインに通知イベントを転送する。
+    if #available(iOS 10.0, *) {
+      UNUserNotificationCenter.current().delegate = self as UNUserNotificationCenterDelegate
+    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -129,25 +136,35 @@ import PDFKit
 
   /// Vision Framework で画像からテキストを認識する。
   /// ML Kit iOS より日本語認識精度が高いため OCR フォールバックに使用する。
+  /// 返値: [[String: Any]] — 各要素に "text", "left", "top", "right", "bottom"（正規化座標 0-1、左上原点）
   private static func recognizeText(imagePath: String, result: @escaping FlutterResult) {
     guard let image = UIImage(contentsOfFile: imagePath),
           let cgImage = image.cgImage else {
-      result("")
+      DispatchQueue.main.async { result([]) }
       return
     }
 
     let request = VNRecognizeTextRequest { req, error in
       if error != nil {
-        result("")
+        DispatchQueue.main.async { result([]) }
         return
       }
       let observations = req.results as? [VNRecognizedTextObservation] ?? []
       // Vision の座標系は Y=0 が下端のため、降順ソートで上から下の読み順にする
       let sorted = observations.sorted { $0.boundingBox.origin.y > $1.boundingBox.origin.y }
-      let text = sorted
-        .compactMap { $0.topCandidates(1).first?.string }
-        .joined(separator: "\n")
-      result(text)
+      // バウンディングボックスを左上原点の正規化座標に変換して返す
+      let blocks: [[String: Any]] = sorted.compactMap { obs in
+        guard let text = obs.topCandidates(1).first?.string else { return nil }
+        let box = obs.boundingBox  // Vision 座標: 左下原点、正規化 [0,1]
+        return [
+          "text":   text,
+          "left":   box.minX,
+          "top":    1.0 - box.maxY,  // Y 反転で左上原点に変換
+          "right":  box.maxX,
+          "bottom": 1.0 - box.minY,
+        ]
+      }
+      DispatchQueue.main.async { result(blocks) }
     }
     request.recognitionLanguages = ["ja-JP", "en-US"]
     request.recognitionLevel = .accurate
@@ -160,7 +177,7 @@ import PDFKit
       do {
         try handler.perform([request])
       } catch {
-        result("")
+        DispatchQueue.main.async { result([]) }
       }
     }
   }

@@ -21,15 +21,20 @@ class PdfPreviewCache {
   static String cachePath(String pdfPath, int pageIndex) =>
       '$pdfPath.p$pageIndex.jpg';
 
+  /// ストリップサムネイル用のキャッシュパス（プレビューとは別サイズ）。
+  static String stripCachePath(String pdfPath, int pageIndex) =>
+      '$pdfPath.s$pageIndex.jpg';
+
   /// ネイティブサムネイル API 経由で JPEG バイト列を取得する。
+  /// [width] を省略すると全幅プレビュー用の 400px で生成する。
   /// 失敗した場合は null を返す。
   static Future<Uint8List?> fetchNativeThumbnail(
-      String pdfPath, int pageIndex) async {
+      String pdfPath, int pageIndex, {double? width}) async {
     try {
       return await _channel.invokeMethod<Uint8List>('getThumbnail', {
         'path': pdfPath,
         'pageIndex': pageIndex,
-        'width': _previewWidth.toDouble(),
+        'width': (width ?? _previewWidth).toDouble(),
       });
     } catch (_) {
       return null;

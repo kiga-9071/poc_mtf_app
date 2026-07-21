@@ -81,7 +81,7 @@ class _PdfTtsHighlightOverlayState extends State<PdfTtsHighlightOverlay> {
           width: r.width,
           height: r.height,
           child: Container(
-            color: Colors.lightBlue.withValues(alpha: 0.45),
+            color: Colors.yellow.withValues(alpha: 0.5),
           ),
         ),
       ],

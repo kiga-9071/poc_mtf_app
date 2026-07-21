@@ -59,6 +59,8 @@ class NotificationService {
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        presentBanner: true,
+        presentList: true,
         categoryIdentifier: withDownload ? _categoryWithDownload : null,
       ),
     );
