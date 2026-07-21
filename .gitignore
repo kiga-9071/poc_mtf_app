@@ -56,3 +56,4 @@ ios/.symlinks/
 # Python
 __pycache__/
 *.pyc
+mock_server/assets/pdfs/*.pdf
