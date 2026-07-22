@@ -87,6 +87,28 @@ import PDFKit
     }
   }
 
+  // PDFDocument キャッシュ（ファイルパス → ドキュメント）。
+  // getThumbnail は頻繁に呼ばれるが、毎回 PDFDocument(url:) を開くと
+  // 大型 PDF で 100〜300ms かかる。キャッシュにより 2 回目以降のコストをほぼゼロにする。
+  // PDFKit のドキュメント操作はスレッドセーフ（並列読み取り可）。
+  private static let docCacheQueue = DispatchQueue(
+    label: "pdf.thumbnail.docCache", qos: .userInteractive, attributes: .concurrent)
+  private static var docCache: [String: PDFDocument] = [:]
+
+  /// キャッシュ済みの PDFDocument を返す。未キャッシュの場合は開いてからキャッシュする。
+  private static func cachedDoc(for filePath: String) -> PDFDocument? {
+    // まずロックなしで読む（ほとんどのケースはキャッシュ済み）
+    if let doc = docCacheQueue.sync(execute: { docCache[filePath] }) { return doc }
+    // キャッシュミス: バリア付き書き込みで排他オープン
+    var opened: PDFDocument? = nil
+    docCacheQueue.sync(flags: .barrier) {
+      if let doc = docCache[filePath] { opened = doc; return }
+      let url = URL(fileURLWithPath: filePath)
+      if let doc = PDFDocument(url: url) { docCache[filePath] = doc; opened = doc }
+    }
+    return opened
+  }
+
   /// PDFKit の thumbnail API でページサムネイルを JPEG として返す。
   /// pdfrx の draw() よりも高速なサムネイル専用コードパスを使用する。
   /// 多くのプロ向け PDF（雑誌等）は内蔵サムネイルを持つためほぼ即時に返る。
@@ -94,8 +116,8 @@ import PDFKit
     filePath: String, pageIndex: Int, width: CGFloat, result: @escaping FlutterResult
   ) {
     DispatchQueue.global(qos: .userInteractive).async {
-      let url = URL(fileURLWithPath: filePath)
-      guard let doc = PDFDocument(url: url),
+      // キャッシュ済み PDFDocument を使用（毎回ファイルを開き直すコストをゼロに）
+      guard let doc = cachedDoc(for: filePath),
             pageIndex >= 0 && pageIndex < doc.pageCount,
             let page = doc.page(at: pageIndex) else {
         DispatchQueue.main.async { result(nil) }

@@ -18,6 +18,11 @@ const _kCacheExtent = 200.0;
 /// 横スクロール可能で、現在ページを赤枠でハイライト表示する。
 /// ブックマーク済みページにはしおりアイコンを表示する。
 /// ダークモード時はサムネイルにも色反転フィルターを適用する。
+///
+/// [document] にはビューアが既に開いている PdfDocument を渡すこと。
+/// 渡さない（または null の場合）はネイティブ API / ディスクキャッシュのみで表示する。
+/// PdfDocumentViewBuilder.file を使わず同じドキュメントを再利用することで、
+/// Pdfium の二重オープンによるロード遅延（最大数十秒）を防ぐ。
 class PdfThumbnailStrip extends StatelessWidget {
   const PdfThumbnailStrip({
     super.key,
@@ -27,6 +32,7 @@ class PdfThumbnailStrip extends StatelessWidget {
     required this.bookmarks,
     required this.scrollController,
     required this.onPageTap,
+    this.document,
   });
 
   /// PDFのローカルファイルパス（サムネイル生成用）
@@ -47,6 +53,10 @@ class PdfThumbnailStrip extends StatelessWidget {
   /// サムネイルタップ時のコールバック（タップしたページ番号を渡す）
   final ValueChanged<int> onPageTap;
 
+  /// ビューアが既に開いている PdfDocument（pdfrx フォールバック用）。
+  /// null の場合はネイティブ API / ディスクキャッシュのみで動作する。
+  final PdfDocument? document;
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -63,83 +73,77 @@ class PdfThumbnailStrip extends StatelessWidget {
                     strokeWidth: 2, color: Colors.white54),
               ),
             )
-          : PdfDocumentViewBuilder.file(
-              filePath,
-              builder: (context, document) {
-                return ListView.builder(
-                  controller: scrollController,
-                  scrollDirection: Axis.horizontal,
-                  // ignore: deprecated_member_use
-                  cacheExtent: _kCacheExtent,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 6),
-                  itemCount: pageCount,
-                  itemBuilder: (context, index) {
-                    final pageNum = index + 1;
-                    final isSelected = pageNum == currentPage;
-                    final isBookmarked = bookmarks.contains(pageNum);
+          : ListView.builder(
+              controller: scrollController,
+              scrollDirection: Axis.horizontal,
+              // ignore: deprecated_member_use
+              cacheExtent: _kCacheExtent,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              itemCount: pageCount,
+              itemBuilder: (context, index) {
+                final pageNum = index + 1;
+                final isSelected = pageNum == currentPage;
+                final isBookmarked = bookmarks.contains(pageNum);
 
-                    return GestureDetector(
-                      onTap: () => onPageTap(pageNum),
-                      child: Container(
-                        width: kPdfThumbnailWidth,
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: isSelected
-                                ? kPdfRedPrimary
-                                : Colors.transparent,
-                            width: 2,
-                          ),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                        child: Column(
-                          children: [
-                            Expanded(
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  // キャッシュ付きサムネイル（一度レンダリングした画像を保持）
-                                  _CachedThumbnail(
-                                    filePath: filePath,
-                                    document: document,
-                                    pageNumber: pageNum,
-                                    isDark: isDark,
-                                  ),
-                                  if (isBookmarked)
-                                    const Positioned(
-                                      top: 2,
-                                      right: 2,
-                                      child: Icon(Icons.bookmark,
-                                          color: Colors.amber, size: 14),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              color: Colors.black54,
-                              width: double.infinity,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 2),
-                              child: Text(
-                                '$pageNum',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: isSelected
-                                      ? Colors.red[200]
-                                      : Colors.white,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                return GestureDetector(
+                  onTap: () => onPageTap(pageNum),
+                  child: Container(
+                    width: kPdfThumbnailWidth,
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: isSelected
+                            ? kPdfRedPrimary
+                            : Colors.transparent,
+                        width: 2,
                       ),
-                    );
-                  },
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              // キャッシュ付きサムネイル（一度レンダリングした画像を保持）
+                              _CachedThumbnail(
+                                filePath: filePath,
+                                document: document,
+                                pageNumber: pageNum,
+                                isDark: isDark,
+                              ),
+                              if (isBookmarked)
+                                const Positioned(
+                                  top: 2,
+                                  right: 2,
+                                  child: Icon(Icons.bookmark,
+                                      color: Colors.amber, size: 14),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          color: Colors.black54,
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Text(
+                            '$pageNum',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isSelected
+                                  ? Colors.red[200]
+                                  : Colors.white,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 );
               },
             ),
@@ -201,7 +205,9 @@ class _CachedThumbnailState extends State<_CachedThumbnail> {
   void didUpdateWidget(_CachedThumbnail old) {
     super.didUpdateWidget(old);
     if (old.filePath != widget.filePath ||
-        old.pageNumber != widget.pageNumber) {
+        old.pageNumber != widget.pageNumber ||
+        // document が null→non-null になった場合は Android の pdfrx フォールバックを再試行する
+        (old.document == null && widget.document != null)) {
       _loadFromCacheOrRender();
     }
   }

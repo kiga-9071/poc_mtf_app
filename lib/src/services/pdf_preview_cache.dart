@@ -64,4 +64,34 @@ class PdfPreviewCache {
       } catch (_) {}
     }
   }
+
+  /// ストリップサムネイルを全ページ分バックグラウンドで生成してディスクにキャッシュする。
+  ///
+  /// PDF ビューアが開いた直後に fire-and-forget で呼ぶことで、ユーザーがサムネイルストリップを
+  /// スクロールする頃にはほぼ全ページがディスクキャッシュ済みとなり即時表示が可能になる。
+  ///
+  /// - iOS: PDFKit.PDFPage.thumbnail を使用（キャッシュ済み PDFDocument で高速）
+  /// - Android: ネイティブ API 未実装のため何もしない（null を返すだけで安全）
+  /// - 既にディスクキャッシュが存在するページはスキップする
+  static Future<void> preWarmStrip(String pdfPath, int pageCount) async {
+    for (int i = 0; i < pageCount; i++) {
+      final path = stripCachePath(pdfPath, i);
+      try {
+        if (await File(path).exists()) continue;
+      } catch (_) {}
+
+      final bytes =
+          await fetchNativeThumbnail(pdfPath, i, width: _stripThumbnailWidth);
+      if (bytes == null) return; // ネイティブ API 未対応環境（Android 等）は即終了
+
+      try {
+        await File(path).writeAsBytes(bytes);
+      } catch (_) {}
+    }
+    debugPrint(
+        '[PdfPreviewCache] strip pre-warm done: ${pdfPath.split('/').last} ($pageCount pages)');
+  }
+
+  // ストリップサムネイルの物理ピクセル幅（@2x 相当）
+  static const double _stripThumbnailWidth = 140.0;
 }

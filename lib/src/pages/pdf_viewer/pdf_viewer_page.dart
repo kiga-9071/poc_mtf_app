@@ -67,6 +67,7 @@ class PdfViewerPage extends HookConsumerWidget {
 
     // 現在開いているPDFファイル（null = ファイル未選択）
     final selectedFile = useState<File?>(null);
+
     // doc==null（Pdfium初期化中）の間でもキャッシュ画像を即時表示するための先読み
     final initialPreview = useState<ui.Image?>(null);
     // 総ページ数（0 = 未ロード）
@@ -585,13 +586,19 @@ class PdfViewerPage extends HookConsumerWidget {
       currentPage.value = pdfPage;
       final virtualIndex =
           isSplitMode.value ? (pdfPage - 1) * 2 : pdfPage - 1;
-      pageController
-          .animateToPage(
-            virtualIndex,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          )
-          .then((_) => isProgrammaticNav.value = false);
+      // PageController が未アタッチ（doc ロード中など）の場合は
+      // animateToPage がアサーションエラーをスローするため try-catch で保護する。
+      try {
+        pageController
+            .animateToPage(
+              virtualIndex,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            )
+            .then((_) => isProgrammaticNav.value = false);
+      } catch (_) {
+        isProgrammaticNav.value = false;
+      }
     }
 
     /// 現在ページのブックマーク状態を切り替え、BookmarkController で永続化する。
@@ -735,6 +742,54 @@ class PdfViewerPage extends HookConsumerWidget {
     final pointerCountNotifier = useMemoized(() => ValueNotifier<int>(0));
     useEffect(() => pointerCountNotifier.dispose, [pointerCountNotifier]);
 
+    // ビューア側でも warmUp を呼ぶことで ContentPreviewCard が先行していない場合も対応する。
+    // warmupComplete が true になったタイミングで rebuild し、PdfDocumentRefDirect に切り替える。
+    // これにより PdfDocumentRefFile（新規 Pdfium オープン）を一切使用せず二重オープンを防ぐ。
+    final warmupComplete = useState(
+      PdfDocumentCache.get(selectedFile.value?.path ?? '') != null,
+    );
+    useEffect(() {
+      final filePath = selectedFile.value?.path;
+      if (filePath == null) return null;
+      if (PdfDocumentCache.get(filePath) != null) {
+        if (!warmupComplete.value) warmupComplete.value = true;
+        return null;
+      }
+      warmupComplete.value = false;
+      var cancelled = false;
+      PdfDocumentCache.warmUp(filePath).then((_) {
+        if (!cancelled) warmupComplete.value = true;
+      });
+      return () { cancelled = true; };
+    }, [selectedFile.value?.path]);
+
+    // PdfDocumentViewBuilder.didUpdateWidget は widget != oldWidget（常に true）のため
+    // 毎ビルドでリスナーの remove → _releaseIfNoRefs → listenable 解放 → _document=null
+    // → PageView 消滅 → pageController が initialPage=0 にリセット → ページ1スナップバック
+    // というバグがある（pdfrx 1.3.5 の既知の動作）。
+    // 解決策: docRef のリスナブルにキープアライブリスナーを常駐させることで
+    // _releaseIfNoRefs の発火を阻止する。リスナーが 1 つ以上残るため解放されず、
+    // load() が loadAttempted=true で即 no-op になり doc が保持され続ける。
+    final _docRefForKeepalive = useMemoized(
+      () {
+        final fp = selectedFile.value?.path;
+        if (fp == null) return null;
+        final cached = PdfDocumentCache.get(fp);
+        // warmup 完了前（cached == null）は null を返して PdfDocumentRefFile による
+        // 二重 Pdfium オープンを防ぐ。
+        if (cached == null) return null;
+        return PdfDocumentRefDirect(cached, autoDispose: false);
+      },
+      [selectedFile.value?.path, warmupComplete.value],
+    );
+    useEffect(() {
+      final docRef = _docRefForKeepalive;
+      if (docRef == null) return null;
+      void keepAlive() {}
+      docRef.resolveListenable().addListener(keepAlive);
+      return () => docRef.resolveListenable().removeListener(keepAlive);
+    }, [_docRefForKeepalive]);
+
     return Scaffold(
       key: scaffoldKey,
       backgroundColor: Colors.black,
@@ -806,19 +861,25 @@ class PdfViewerPage extends HookConsumerWidget {
                     },
                     child: SelectionArea(
                     child: Builder(builder: (context) {
-                    // キャッシュ済みドキュメントがあれば PdfDocumentRefDirect で即時表示、
-                    // なければ通常の PdfDocumentRefFile でロードする。
                     final filePath = selectedFile.value!.path;
-                    final cachedDoc = PdfDocumentCache.get(filePath);
-                    final docRef = cachedDoc != null
-                        ? PdfDocumentRefDirect(cachedDoc, autoDispose: false)
-                        : PdfDocumentRefFile(filePath);
+                    final docRef = _docRefForKeepalive;
+                    // warmup 完了前は PdfDocumentRefFile を使わずスピナー表示
+                    // （PdfDocumentRefFile は別 Pdfium インスタンスを開き二重オープンになるため禁止）
+                    if (docRef == null) {
+                      final preview = initialPreview.value;
+                      if (preview != null) {
+                        return Center(
+                            child: RawImage(image: preview, fit: BoxFit.contain));
+                      }
+                      return const Center(
+                          child: CircularProgressIndicator(color: Colors.white54));
+                    }
                     return PdfDocumentViewBuilder(
                       key: ValueKey(filePath),
                       documentRef: docRef,
                       builder: (context, doc) {
                         if (doc == null) {
-                          // キャッシュ先読み済みなら即座に表示、なければスピナー
+                          // PdfDocumentRefDirect 使用時はここには来ないが安全網として残す
                           final preview = initialPreview.value;
                           if (preview != null) {
                             return Center(
@@ -826,7 +887,7 @@ class PdfViewerPage extends HookConsumerWidget {
                                     image: preview, fit: BoxFit.contain));
                           }
                           return const Center(
-                              child: CircularProgressIndicator());
+                              child: CircularProgressIndicator(color: Colors.white54));
                         }
                         // ページ数が確定したタイミングで状態を初期化
                         if (pageCount.value == 0 && doc.pages.isNotEmpty) {
@@ -841,6 +902,14 @@ class PdfViewerPage extends HookConsumerWidget {
                             // ── フェーズ1: ドキュメントオープン完了 ──────────────
                             debugPrint(
                                 '[PDF Phase1] ドキュメントオープン: ${(ms / 1000).toStringAsFixed(2)}秒');
+                            // ストリップサムネイルを全ページ分バックグラウンドで先読みする。
+                            // スクロール時点でディスクキャッシュ済みになるため即時表示が可能になる。
+                            // iOS のみ有効（Android は fetchNativeThumbnail が null を返して即終了）。
+                            final fp = selectedFile.value?.path;
+                            if (fp != null) {
+                              // ignore: unawaited_futures
+                              PdfPreviewCache.preWarmStrip(fp, doc.pages.length);
+                            }
                           });
                         }
                         // 指の本数を追跡して PageView のスワイプを即座に無効化する。
@@ -1264,6 +1333,10 @@ class PdfViewerPage extends HookConsumerWidget {
                   bookmarks: bookmarks.value,
                   scrollController: thumbnailScrollController,
                   onPageTap: goToPage,
+                  // ビューアが既に開いているドキュメントを渡す。
+                  // サムネイルストリップ側で Pdfium を二重オープンするのを防ぎ、
+                  // 大容量PDFで発生していた数十秒のロード遅延を解消する。
+                  document: document.value,
                 ),
               ),
             ),
