@@ -53,18 +53,22 @@ import PDFKit
       binaryMessenger: thumbRegistrar.messenger()
     )
     thumbChannel.setMethodCallHandler { call, result in
-      guard call.method == "getThumbnail" else {
+      switch call.method {
+      case "getThumbnail":
+        guard let args = call.arguments as? [String: Any],
+              let filePath = args["path"] as? String,
+              let pageIndex = args["pageIndex"] as? Int,
+              let width = args["width"] as? Double else {
+          result(FlutterError(code: "INVALID_ARGS", message: nil, details: nil))
+          return
+        }
+        AppDelegate.getThumbnail(filePath: filePath, pageIndex: pageIndex, width: CGFloat(width), result: result)
+      case "getTimezone":
+        // zonedSchedule 用タイムゾーン名（IANA 形式: "Asia/Tokyo" 等）
+        result(TimeZone.current.identifier)
+      default:
         result(FlutterMethodNotImplemented)
-        return
       }
-      guard let args = call.arguments as? [String: Any],
-            let filePath = args["path"] as? String,
-            let pageIndex = args["pageIndex"] as? Int,
-            let width = args["width"] as? Double else {
-        result(FlutterError(code: "INVALID_ARGS", message: nil, details: nil))
-        return
-      }
-      AppDelegate.getThumbnail(filePath: filePath, pageIndex: pageIndex, width: CGFloat(width), result: result)
     }
 
     // PDFKit テキスト抽出チャンネル
@@ -130,9 +134,14 @@ import PDFKit
       }
       let height = width * mediaBox.height / mediaBox.width
       let size = CGSize(width: width, height: height)
-      // PDFPage.thumbnail() は draw() より高速なサムネイル専用パス
-      let thumbnail = page.thumbnail(of: size, for: .mediaBox)
-      guard let data = thumbnail.jpegData(compressionQuality: 0.75) else {
+      // PDFPage.thumbnail() は draw() より高速なサムネイル専用パス。
+      // iOS 13+ ではダークモード時に色が反転するため、ライトモードを強制する。
+      var thumbnail: UIImage?
+      UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
+        thumbnail = page.thumbnail(of: size, for: .mediaBox)
+      }
+      guard let thumbnail = thumbnail,
+            let data = thumbnail.jpegData(compressionQuality: 0.75) else {
         DispatchQueue.main.async { result(nil) }
         return
       }

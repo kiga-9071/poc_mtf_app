@@ -22,8 +22,12 @@ class PdfPreviewCache {
       '$pdfPath.p$pageIndex.jpg';
 
   /// ストリップサムネイル用のキャッシュパス（プレビューとは別サイズ）。
+  /// プレフィックスに数字を含めると旧形式（.s{n}）と衝突するため、
+  /// 文字のみのプレフィックス `.strip` を使用する。
+  ///   旧 .s{n}  → .s30.jpg が新 .s3{n} の n=0 と一致（衝突！）
+  ///   新 .strip{n} → いかなる旧形式とも一致しない（安全）
   static String stripCachePath(String pdfPath, int pageIndex) =>
-      '$pdfPath.s$pageIndex.jpg';
+      '$pdfPath.strip$pageIndex.jpg';
 
   /// ネイティブサムネイル API 経由で JPEG バイト列を取得する。
   /// [width] を省略すると全幅プレビュー用の 400px で生成する。

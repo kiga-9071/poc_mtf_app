@@ -59,8 +59,6 @@ class PdfThumbnailStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       height: kPdfThumbnailHeight + 32,
       color: Colors.grey[850],
@@ -111,7 +109,6 @@ class PdfThumbnailStrip extends StatelessWidget {
                                 filePath: filePath,
                                 document: document,
                                 pageNumber: pageNum,
-                                isDark: isDark,
                               ),
                               if (isBookmarked)
                                 const Positioned(
@@ -165,13 +162,11 @@ class _CachedThumbnail extends StatefulWidget {
     required this.filePath,
     required this.document,
     required this.pageNumber,
-    required this.isDark,
   });
 
   final String filePath;
   final PdfDocument? document;
   final int pageNumber;
-  final bool isDark;
 
   @override
   State<_CachedThumbnail> createState() => _CachedThumbnailState();
@@ -236,6 +231,11 @@ class _CachedThumbnailState extends State<_CachedThumbnail> {
 
   Future<void> _render() async {
     _rendering = true;
+    // レンダー開始時点の document を記録する。
+    // 非同期処理中に document が null→non-null に変わった場合、
+    // didUpdateWidget は _rendering==true を見てスキップするため、
+    // _render() 完了後にリトライを行う必要がある。
+    final docAtStart = widget.document;
     final pageIndex = widget.pageNumber - 1;
     final cachePath =
         PdfPreviewCache.stripCachePath(widget.filePath, pageIndex);
@@ -295,10 +295,12 @@ class _CachedThumbnailState extends State<_CachedThumbnail> {
       final page = doc.pages[pageIndex];
       final w = kPdfThumbnailWidth.toInt();
       final h = (w * page.height / page.width).ceil();
-      // fullWidth/fullHeight でページ全体を縮小レンダリング
+      // fullWidth/fullHeight でページ全体を縮小レンダリング。
+      // backgroundColor を指定しないと透明背景になり、合成時に暗い色になることがある。
       final pdfImg = await page.render(
         fullWidth: w.toDouble(),
         fullHeight: h.toDouble(),
+        backgroundColor: const Color(0xFFFFFFFF),
       );
       if (pdfImg == null) return;
       final img = await pdfImg.createImage();
@@ -312,6 +314,17 @@ class _CachedThumbnailState extends State<_CachedThumbnail> {
     } finally {
       _rendering = false;
       _releaseSlot();
+    }
+
+    // レンダー中に document が null→non-null に変わり、かつ画像が取得できなかった場合は
+    // リトライする。didUpdateWidget は _rendering==true 中に発火するとスキップするため
+    // この後処理でカバーする。
+    if (mounted &&
+        _image == null &&
+        _cache[_key] == null &&
+        docAtStart == null &&
+        widget.document != null) {
+      _render();
     }
   }
 
@@ -332,16 +345,12 @@ class _CachedThumbnailState extends State<_CachedThumbnail> {
       return ColoredBox(color: Colors.grey[700]!);
     }
     // 白背景を敷くことで BoxFit.contain の余白部分が黒くなるのを防ぐ。
-    // ダークモード時は kPdfInvertColorFilter が白→黒に反転するため自然な見た目になる。
-    Widget w = ColoredBox(
+    // サムネイルはナビゲーション用のため、ダークモードでも実際のPDFページ色で表示する。
+    return ColoredBox(
       color: Colors.white,
       child: SizedBox.expand(
         child: RawImage(image: img, fit: BoxFit.contain),
       ),
     );
-    if (widget.isDark) {
-      w = ColorFiltered(colorFilter: kPdfInvertColorFilter, child: w);
-    }
-    return w;
   }
 }

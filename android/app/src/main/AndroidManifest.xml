@@ -5,10 +5,13 @@
     <!-- ローカルPush通知 -->
     <!-- Android 13+ の通知権限（requestNotificationsPermission() で実行時リクエスト） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <!-- スケジュール通知の正確な時刻指定（Android 12+） -->
+    <!-- スケジュール通知の正確な時刻指定（Android 12+、exactAllowWhileIdle に必要） -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <!-- 端末再起動後にスケジュール通知を復元するため -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- 電池最適化の除外をリクエストする権限。
+         OEM 独自の省電力機能がアプリ kill 時にアラームを削除するのを防ぐために必要。 -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <application
         android:label="pdf_app"
         android:name="${applicationName}"
@@ -37,6 +40,11 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- ローカル通知アラーム受信。Flutter エンジン不要で kill 状態でも動作する。 -->
+        <receiver
+            android:name=".LocalNotificationReceiver"
+            android:exported="false"/>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
