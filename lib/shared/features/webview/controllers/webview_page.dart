@@ -78,18 +78,27 @@ class _WebViewPageState extends State<WebViewPage> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFCC0000),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 48),
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 24),
-                      textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                      shape: const StadiumBorder(),
-                      elevation: 0,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 296),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFCC0000),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(0, 48),
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 24),
+                            textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                            shape: const StadiumBorder(),
+                            elevation: 0,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('一覧へ戻る'),
+                        ),
+                      ),
                     ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('一覧へ戻る'),
                   ),
                 ),
               ),
