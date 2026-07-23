@@ -398,9 +398,9 @@ class PdfViewerPage extends HookConsumerWidget {
           if (speakText.isEmpty && Platform.isIOS) {
             final filePath = selectedFile.value?.path;
             if (filePath != null) {
-              const _kPdfChannel = MethodChannel('app.tts.pdf');
+              const kPdfChannel = MethodChannel('app.tts.pdf');
               try {
-                final pdfKitText = await _kPdfChannel.invokeMethod<String>(
+                final pdfKitText = await kPdfChannel.invokeMethod<String>(
                       'extractText',
                       {'filePath': filePath, 'pageIndex': currentPage.value - 1},
                     ) ?? '';
@@ -770,7 +770,7 @@ class PdfViewerPage extends HookConsumerWidget {
     // 解決策: docRef のリスナブルにキープアライブリスナーを常駐させることで
     // _releaseIfNoRefs の発火を阻止する。リスナーが 1 つ以上残るため解放されず、
     // load() が loadAttempted=true で即 no-op になり doc が保持され続ける。
-    final _docRefForKeepalive = useMemoized(
+    final docRefForKeepalive = useMemoized(
       () {
         final fp = selectedFile.value?.path;
         if (fp == null) return null;
@@ -783,12 +783,12 @@ class PdfViewerPage extends HookConsumerWidget {
       [selectedFile.value?.path, warmupComplete.value],
     );
     useEffect(() {
-      final docRef = _docRefForKeepalive;
+      final docRef = docRefForKeepalive;
       if (docRef == null) return null;
       void keepAlive() {}
       docRef.resolveListenable().addListener(keepAlive);
       return () => docRef.resolveListenable().removeListener(keepAlive);
-    }, [_docRefForKeepalive]);
+    }, [docRefForKeepalive]);
 
     return Scaffold(
       key: scaffoldKey,
@@ -862,7 +862,7 @@ class PdfViewerPage extends HookConsumerWidget {
                     child: SelectionArea(
                     child: Builder(builder: (context) {
                     final filePath = selectedFile.value!.path;
-                    final docRef = _docRefForKeepalive;
+                    final docRef = docRefForKeepalive;
                     // warmup 完了前は PdfDocumentRefFile を使わずスピナー表示
                     // （PdfDocumentRefFile は別 Pdfium インスタンスを開き二重オープンになるため禁止）
                     if (docRef == null) {
@@ -1588,30 +1588,30 @@ List<({String text, int start})> _buildTtsChunks(String text, {int maxLen = 2000
 ///   Flutter の画面座標系と同じ向きになり、そのままスケールして配置できる。
 Future<({String text, List<({String text, Rect normalizedRect})> blocks})>
     _extractTextByOcr(String filePath, int pageIndex, String langCode) async {
-  const _empty = (text: '', blocks: <({String text, Rect normalizedRect})>[]);
+  const empty = (text: '', blocks: <({String text, Rect normalizedRect})>[]);
 
   // ビューアーのdocとは別インスタンスでPDFを開く（render競合を回避）
   final doc = await PdfDocument.openFile(filePath);
   try {
     final page = doc.pages[pageIndex];
     // PDF は 72pt 基準。小さな日本語本文の認識には 432 DPI 相当の 6x でレンダリング
-    const _kOcrScale = 6.0;
-    final w = (page.width * _kOcrScale).toInt();
-    final h = (page.height * _kOcrScale).toInt();
-    debugPrint('[OCR] render size=${w}x${h}, page=${page.width.toStringAsFixed(1)}x${page.height.toStringAsFixed(1)}pt');
+    const kOcrScale = 6.0;
+    final w = (page.width * kOcrScale).toInt();
+    final h = (page.height * kOcrScale).toInt();
+    debugPrint('[OCR] render size=${w}x$h, page=${page.width.toStringAsFixed(1)}x${page.height.toStringAsFixed(1)}pt');
     // fullWidth/fullHeight を明示することで PDF コンテンツが w×h ピクセル全体に
     // レンダリングされる。省略すると pdfrx が page.width (72DPI=595pt) をデフォルトとして
     // 使用し、コンテンツが左上の 595×842 領域にのみ描画されてしまう。
     final pdfImage = await page.render(fullWidth: w.toDouble(), fullHeight: h.toDouble());
     debugPrint('[OCR] pdfImage=${pdfImage == null ? "null" : "${pdfImage.width}x${pdfImage.height}"}');
-    if (pdfImage == null) return _empty;
+    if (pdfImage == null) return empty;
     // w/h（fullWidth/fullHeight として渡した値）で正規化する。
     try {
       final uiImage = await pdfImage.createImage();
       final byteData =
           await uiImage.toByteData(format: ui.ImageByteFormat.png);
       debugPrint('[OCR] byteData=${byteData == null ? "null" : "${byteData.lengthInBytes} bytes"}');
-      if (byteData == null) return _empty;
+      if (byteData == null) return empty;
 
       final tempDir = await getTemporaryDirectory();
       final tempFile = File('${tempDir.path}/tts_ocr_page.png');
@@ -1621,13 +1621,13 @@ Future<({String text, List<({String text, Rect normalizedRect})> blocks})>
         // ML Kit iOS は日本語 OCR 精度が低いため、Apple Vision Framework を使用する。
         // AppDelegate.recognizeText が [{text, left, top, right, bottom}] を返す。
         // Swift 側で Y 反転済み（左上原点、[0,1] 正規化座標）なのでそのまま使用。
-        const _kVisionChannel = MethodChannel('app.tts.ocr');
+        const kVisionChannel = MethodChannel('app.tts.ocr');
         try {
-          final rawBlocks = await _kVisionChannel.invokeMethod<List>(
+          final rawBlocks = await kVisionChannel.invokeMethod<List>(
             'recognizeText',
             {'imagePath': tempFile.path},
           );
-          if (rawBlocks == null || rawBlocks.isEmpty) return _empty;
+          if (rawBlocks == null || rawBlocks.isEmpty) return empty;
           final ocrBlocks = rawBlocks.cast<Map>().map((m) {
             final blockText = m['text'] as String? ?? '';
             // Swift からは Flutter 慣行の正規化座標（左上原点 [0,1]）で届く
@@ -1644,7 +1644,7 @@ Future<({String text, List<({String text, Rect normalizedRect})> blocks})>
           return (text: joinedText, blocks: ocrBlocks);
         } catch (e) {
           debugPrint('[OCR] Vision error: $e');
-          return _empty;
+          return empty;
         }
       }
 

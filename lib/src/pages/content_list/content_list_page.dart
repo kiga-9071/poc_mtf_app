@@ -499,13 +499,13 @@ class ContentListPage extends HookConsumerWidget {
                 ),
               ),
             ],
-            indicatorColor: Color(0xFFCC0000),
+            indicatorColor: const Color(0xFFCC0000),
             indicatorSize: TabBarIndicatorSize.tab,
             indicatorWeight: 3,
-            labelColor: Color(0xFFCC0000),
+            labelColor: const Color(0xFFCC0000),
             unselectedLabelColor: Colors.grey,
-            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            unselectedLabelStyle: TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
+            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
           ),
           actions: [
             IconButton(

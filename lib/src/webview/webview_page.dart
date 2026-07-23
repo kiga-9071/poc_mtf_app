@@ -17,9 +17,6 @@ class WebViewPage extends StatefulWidget {
 }
 
 class _WebViewPageState extends State<WebViewPage> {
-  /// InAppWebViewの操作コントローラー（ページ遷移・JS実行・タイトル取得など）
-  InAppWebViewController? _controller;
-
   /// ページ読み込み中かどうかのフラグ（AppBar下部プログレスバー表示に使用）
   bool _isLoading = true;
 
@@ -77,10 +74,7 @@ class _WebViewPageState extends State<WebViewPage> {
           mediaPlaybackRequiresUserGesture: false,
           clearCache: false,
         ),
-        // WebView が生成されたタイミングでコントローラーを保持
-        onWebViewCreated: (controller) {
-          _controller = controller;
-        },
+        onWebViewCreated: (_) {},
         // ページ読み込み開始
         onLoadStart: (controller, url) {
           if (mounted) setState(() => _isLoading = true);

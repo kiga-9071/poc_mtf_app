@@ -85,16 +85,20 @@ Future<void> showStorageSettingsDialog(BuildContext context) async {
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
               ),
               const SizedBox(height: 4),
-              ...options.map(
-                (opt) => RadioListTile<int>(
-                  title: Text(opt.$2),
-                  value: opt.$1 * 1024 * 1024,
-                  groupValue: selectedLimit,
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  onChanged: (v) {
-                    if (v != null) setState(() => selectedLimit = v);
-                  },
+              RadioGroup<int>(
+                groupValue: selectedLimit,
+                onChanged: (v) {
+                  if (v != null) setState(() => selectedLimit = v);
+                },
+                child: Column(
+                  children: options.map(
+                    (opt) => RadioListTile<int>(
+                      title: Text(opt.$2),
+                      value: opt.$1 * 1024 * 1024,
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ).toList(),
                 ),
               ),
             ],

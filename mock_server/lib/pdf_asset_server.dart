@@ -102,7 +102,7 @@ class PdfAssetServer {
       _fileCache[filename] = file;
       _extracting.remove(filename);
       final mb = (data.lengthInBytes / 1024 / 1024).toStringAsFixed(1);
-      debugPrint('PdfAssetServer: extracted "$filename" (${mb} MB)');
+      debugPrint('PdfAssetServer: extracted "$filename" ($mb MB)');
       return file;
     } catch (e) {
       _extracting.remove(filename);
