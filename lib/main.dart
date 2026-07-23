@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:mock_server/pdf_asset_server.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -84,6 +85,11 @@ final _router = GoRouter(
 /// アプリ内 PDF サーバーのシングルトン。ホットリスタートでの二重バインドを防ぐためトップレベルで保持する。
 final _pdfServer = PdfAssetServer();
 
+/// iOS の WKWebView プロセスをアプリ起動時にウォームアップしておくための
+/// HeadlessInAppWebView。参照を保持しないとネイティブビューが解放されるため
+/// トップレベルで保持する。
+HeadlessInAppWebView? _warmupWebView;
+
 /// [_pdfServer] を起動する。
 ///
 /// contents.json のみをメモリに保持し、PDF は最初のリクエスト時に
@@ -123,6 +129,17 @@ Future<void> _startPdfServer() async {
 Future<void> main() async {
   // Flutter エンジンの初期化（SharedPreferences など非同期処理の前に必要）
   WidgetsFlutterBinding.ensureInitialized();
+
+  // iOS の WKWebView は初回起動時に WebKit プロセスの起動コストが大きい。
+  // about:blank をバックグラウンドでロードして WebKit プロセスを先行起動しておくことで
+  // ユーザーが WebView を開いたときの待ち時間を削減する。
+  if (Platform.isIOS) {
+    _warmupWebView = HeadlessInAppWebView(
+      initialUrlRequest: URLRequest(url: WebUri('about:blank')),
+    );
+    _warmupWebView!.run(); // ignore: unawaited_futures
+  }
+
   await Future.wait([
     Firebase.initializeApp(),
     NotificationService.initialize(

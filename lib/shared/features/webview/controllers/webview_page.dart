@@ -36,6 +36,7 @@ class _WebViewPageState extends State<WebViewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(
           _title.isEmpty ? widget.url : _title,
@@ -60,7 +61,6 @@ class _WebViewPageState extends State<WebViewPage> {
             ? PreferredSize(
                 preferredSize: const Size.fromHeight(2),
                 child: LinearProgressIndicator(
-                  // 進捗が 0 のうちは indeterminate 表示
                   value: _progress > 0 ? _progress : null,
                   backgroundColor: const Color(0xFFAA0000),
                   valueColor:
@@ -69,76 +69,108 @@ class _WebViewPageState extends State<WebViewPage> {
               )
             : null,
       ),
-      bottomNavigationBar: widget.showBackToList
-          ? SafeArea(
+      // bottomNavigationBar の代わりに Stack でオーバーレイする。
+      // Scaffold.bottomNavigationBar を使うと iOS の WKWebView がボディ高さを
+      // 正しく取得できずコンテンツが表示されないため、この方式を採用する。
+      body: Stack(
+        children: [
+          Padding(
+            // ボタンバー表示時はその高さ分だけ WebView の下端を上げ、
+            // コンテンツがボタンの後ろに隠れないようにする。
+            // ボタンバーの高さ = 上下 padding 24px + ボタン 48px + ホームインジケーター
+            padding: widget.showBackToList
+                ? EdgeInsets.only(
+                    bottom: 72 + MediaQuery.of(context).padding.bottom,
+                  )
+                : EdgeInsets.zero,
+            child: InAppWebView(
+            initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+            initialSettings: InAppWebViewSettings(
+              javaScriptEnabled: true,
+              allowsInlineMediaPlayback: true,
+              mediaPlaybackRequiresUserGesture: false,
+              clearCache: false,
+            ),
+            onWebViewCreated: (_) {},
+            // iOS の WKWebView は http/https 以外のスキーム（itms:// 等）への
+            // リダイレクトを処理できず onLoadStop/onReceivedError が発火しないまま
+            // 無限ローディングになるため、非 http/https スキームはキャンセルする。
+            shouldOverrideUrlLoading: (controller, navigationAction) async {
+              final scheme = navigationAction.request.url?.scheme ?? '';
+              if (scheme != 'http' && scheme != 'https' &&
+                  scheme != 'about' && scheme != 'javascript') {
+                if (mounted) setState(() => _isLoading = false);
+                return NavigationActionPolicy.CANCEL;
+              }
+              return NavigationActionPolicy.ALLOW;
+            },
+            onLoadStart: (controller, url) {
+              if (mounted) setState(() => _isLoading = true);
+            },
+            onProgressChanged: (controller, progress) {
+              if (mounted) setState(() => _progress = progress / 100.0);
+            },
+            onLoadStop: (controller, url) async {
+              final title = await controller.getTitle();
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                  _title = title ?? widget.url;
+                });
+              }
+            },
+            onReceivedHttpError: (controller, request, errorResponse) {
+              if (mounted) setState(() => _isLoading = false);
+            },
+            onReceivedError: (controller, request, error) {
+              if (mounted) setState(() => _isLoading = false);
+            },
+          ),
+          ),
+          if (widget.showBackToList)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
               child: DecoratedBox(
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   border: Border(top: BorderSide(color: Color(0xFFE0E0E0))),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 296),
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFCC0000),
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(0, 48),
-                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 24),
-                            textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                            shape: const StadiumBorder(),
-                            elevation: 0,
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 296),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFCC0000),
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(0, 48),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 10, horizontal: 24),
+                              textStyle: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w600),
+                              shape: const StadiumBorder(),
+                              elevation: 0,
+                            ),
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('一覧へ戻る'),
                           ),
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('一覧へ戻る'),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            )
-          : null,
-      body: InAppWebView(
-        // 初期読み込みURLを URLRequest で指定
-        initialUrlRequest: URLRequest(url: WebUri(widget.url)),
-        initialSettings: InAppWebViewSettings(
-          // JavaScript を有効化
-          javaScriptEnabled: true,
-          // インライン動画再生を許可
-          allowsInlineMediaPlayback: true,
-          // 動画の自動再生をユーザー操作なしで許可
-          mediaPlaybackRequiresUserGesture: false,
-          clearCache: false,
-        ),
-        onWebViewCreated: (_) {},
-        // ページ読み込み開始
-        onLoadStart: (controller, url) {
-          if (mounted) setState(() => _isLoading = true);
-        },
-        // 読み込み進捗の更新（0〜100 の int → 0.0〜1.0 に変換）
-        onProgressChanged: (controller, progress) {
-          if (mounted) setState(() => _progress = progress / 100.0);
-        },
-        // ページ読み込み完了：タイトルを取得して AppBar に反映
-        onLoadStop: (controller, url) async {
-          final title = await controller.getTitle();
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-              _title = title ?? widget.url;
-            });
-          }
-        },
-        // ネットワークエラー時はローディングを解除
-        onReceivedError: (controller, request, error) {
-          if (mounted) setState(() => _isLoading = false);
-        },
+            ),
+        ],
       ),
     );
   }
