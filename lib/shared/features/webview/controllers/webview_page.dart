@@ -1,11 +1,10 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import '../../../../core/utils/l10n.dart';
 
-/// PDF内のリンクをタップしたときにアプリ内で開くWebView画面。
-/// flutter_inappwebview を使用して実装。
-/// [url] には開くWebページのURL文字列を渡す。
 class WebViewPage extends StatefulWidget {
   const WebViewPage({
     super.key,
@@ -13,7 +12,6 @@ class WebViewPage extends StatefulWidget {
     this.showBackToList = false,
   });
 
-  /// 表示するWebページのURL
   final String url;
 
   /// true のとき画面下部に「一覧へ戻る」固定バーを表示する（PickUP記事用）
@@ -24,17 +22,20 @@ class WebViewPage extends StatefulWidget {
 }
 
 class _WebViewPageState extends State<WebViewPage> {
-  /// ページ読み込み中かどうかのフラグ（AppBar下部プログレスバー表示に使用）
   bool _isLoading = true;
-
-  /// ページタイトル（onLoadStop で取得後に AppBar に表示）
   String _title = '';
-
-  /// 読み込み進捗（0.0〜1.0）。indeterminate なら null として扱う。
   double _progress = 0;
+
+  /// 「一覧へ戻る」バーの表示フラグ（初期表示あり）
+  bool _showBottomBar = true;
+
+  /// スクロール方向検知用の直前 Y 座標
+  double _lastScrollY = 0;
 
   @override
   Widget build(BuildContext context) {
+    final barHeight = 72.0 + MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
@@ -56,7 +57,6 @@ class _WebViewPageState extends State<WebViewPage> {
             },
           ),
         ],
-        // ページ読み込み中のみ AppBar 下部に進捗バーを表示
         bottom: _isLoading
             ? PreferredSize(
                 preferredSize: const Size.fromHeight(2),
@@ -69,21 +69,9 @@ class _WebViewPageState extends State<WebViewPage> {
               )
             : null,
       ),
-      // bottomNavigationBar の代わりに Stack でオーバーレイする。
-      // Scaffold.bottomNavigationBar を使うと iOS の WKWebView がボディ高さを
-      // 正しく取得できずコンテンツが表示されないため、この方式を採用する。
       body: Stack(
         children: [
-          Padding(
-            // ボタンバー表示時はその高さ分だけ WebView の下端を上げ、
-            // コンテンツがボタンの後ろに隠れないようにする。
-            // ボタンバーの高さ = 上下 padding 24px + ボタン 48px + ホームインジケーター
-            padding: widget.showBackToList
-                ? EdgeInsets.only(
-                    bottom: 72 + MediaQuery.of(context).padding.bottom,
-                  )
-                : EdgeInsets.zero,
-            child: InAppWebView(
+          InAppWebView(
             initialUrlRequest: URLRequest(url: WebUri(widget.url)),
             initialSettings: InAppWebViewSettings(
               javaScriptEnabled: true,
@@ -91,10 +79,36 @@ class _WebViewPageState extends State<WebViewPage> {
               mediaPlaybackRequiresUserGesture: false,
               clearCache: false,
             ),
-            onWebViewCreated: (_) {},
-            // iOS の WKWebView は http/https 以外のスキーム（itms:// 等）への
-            // リダイレクトを処理できず onLoadStop/onReceivedError が発火しないまま
-            // 無限ローディングになるため、非 http/https スキームはキャンセルする。
+            // ページ読み込み後に click イベントを監視する UserScript を注入。
+            // ユーザーが画面をタップすると Flutter ハンドラ 'onTap' が呼ばれ
+            // 「一覧へ戻る」バーを再表示する。
+            initialUserScripts: widget.showBackToList
+                ? UnmodifiableListView([
+                    UserScript(
+                      source: '''
+                        document.addEventListener('click', function() {
+                          if (window.flutter_inappwebview) {
+                            window.flutter_inappwebview.callHandler('onTap');
+                          }
+                        });
+                      ''',
+                      injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+                    ),
+                  ])
+                : UnmodifiableListView([]),
+            onWebViewCreated: (controller) {
+              if (!widget.showBackToList) return;
+              controller.addJavaScriptHandler(
+                handlerName: 'onTap',
+                callback: (_) {
+                  if (mounted && !_showBottomBar) {
+                    setState(() => _showBottomBar = true);
+                  }
+                },
+              );
+            },
+            // iOS の WKWebView は http/https 以外のスキームへのリダイレクトを
+            // 処理できず無限ローディングになるためキャンセルする。
             shouldOverrideUrlLoading: (controller, navigationAction) async {
               final scheme = navigationAction.request.url?.scheme ?? '';
               if (scheme != 'http' && scheme != 'https' &&
@@ -125,13 +139,25 @@ class _WebViewPageState extends State<WebViewPage> {
             onReceivedError: (controller, request, error) {
               if (mounted) setState(() => _isLoading = false);
             },
-          ),
+            // 下スクロール（y 増加）でバーを非表示。
+            // 再表示はスクロールではなく画面タップで行う。
+            onScrollChanged: (controller, x, y) {
+              if (!widget.showBackToList) return;
+              final delta = y - _lastScrollY;
+              _lastScrollY = y.toDouble();
+              if (delta.abs() < 5) return;
+              if (delta > 0 && mounted && _showBottomBar) {
+                setState(() => _showBottomBar = false);
+              }
+            },
           ),
           if (widget.showBackToList)
-            Positioned(
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
               left: 0,
               right: 0,
-              bottom: 0,
+              bottom: _showBottomBar ? 0 : -barHeight,
               child: DecoratedBox(
                 decoration: const BoxDecoration(
                   color: Colors.white,
