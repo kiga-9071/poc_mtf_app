@@ -5,8 +5,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 
-import '../../services/pdf_preview_cache.dart';
-import 'pdf_viewer_constants.dart';
+import '../repositories/local/pdf_preview_cache.dart';
+import '../constants/pdf_viewer_constants.dart';
 
 // スクロール方向に事前レンダリングするウィジェット領域（px）
 // 大きすぎると初期表示時に多数のページが同時レンダリングキューに積まれ、

@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
-import '../l10n.dart';
+import '../../../../core/utils/l10n.dart';
 
 /// PDF内のリンクをタップしたときにアプリ内で開くWebView画面。
 /// flutter_inappwebview を使用して実装。
 /// [url] には開くWebページのURL文字列を渡す。
 class WebViewPage extends StatefulWidget {
-  const WebViewPage({super.key, required this.url});
+  const WebViewPage({
+    super.key,
+    required this.url,
+    this.showBackToList = false,
+  });
 
   /// 表示するWebページのURL
   final String url;
+
+  /// true のとき画面下部に「一覧へ戻る」固定バーを表示する（PickUP記事用）
+  final bool showBackToList;
 
   @override
   State<WebViewPage> createState() => _WebViewPageState();
@@ -62,6 +69,32 @@ class _WebViewPageState extends State<WebViewPage> {
               )
             : null,
       ),
+      bottomNavigationBar: widget.showBackToList
+          ? SafeArea(
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Color(0xFFE0E0E0))),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFCC0000),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 48),
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 24),
+                      textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      shape: const StadiumBorder(),
+                      elevation: 0,
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('一覧へ戻る'),
+                  ),
+                ),
+              ),
+            )
+          : null,
       body: InAppWebView(
         // 初期読み込みURLを URLRequest で指定
         initialUrlRequest: URLRequest(url: WebUri(widget.url)),

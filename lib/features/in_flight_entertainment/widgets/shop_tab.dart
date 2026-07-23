@@ -26,7 +26,7 @@ const _sampleProducts = [
     price: '¥4,500',
     rating: 4.5,
     reviewCount: 23,
-    imagePath: 'assets/shop_single.png',
+    imagePath: 'assets/images/originals/shop_single.png',
     url: 'https://ec.jal.co.jp/shop/g/g0001-60121-02/',
   ),
   _ShopProduct(
@@ -34,7 +34,7 @@ const _sampleProducts = [
     price: '¥8,800',
     rating: 4.2,
     reviewCount: 15,
-    imagePath: 'assets/shop_lohme.png',
+    imagePath: 'assets/images/originals/shop_lohme.png',
     url: 'https://ec.jal.co.jp/shop/g/g0001-81266-02/',
   ),
   _ShopProduct(
@@ -42,7 +42,7 @@ const _sampleProducts = [
     price: '¥2,200',
     rating: 4.8,
     reviewCount: 42,
-    imagePath: 'assets/shop_famillea.png',
+    imagePath: 'assets/images/originals/shop_famillea.png',
     url: 'https://ec.jal.co.jp/shop/g/g0001-88408-02/',
   ),
   _ShopProduct(
@@ -50,7 +50,7 @@ const _sampleProducts = [
     price: '¥3,300',
     rating: 4.6,
     reviewCount: 31,
-    imagePath: 'assets/shop_toystory.png',
+    imagePath: 'assets/images/originals/shop_toystory.png',
     url: 'https://ec.jal.co.jp/shop/g/g0001-88403-02/',
   ),
 ];
@@ -61,7 +61,7 @@ const _allProducts = [
     price: '¥13,500',
     rating: 0,
     reviewCount: 0,
-    imagePath: 'assets/shop_unagi.jpg',
+    imagePath: 'assets/images/originals/shop_unagi.jpg',
     url: 'https://ec.jal.co.jp/shop/g/g0028-69061/',
   ),
   _ShopProduct(
@@ -69,7 +69,7 @@ const _allProducts = [
     price: '¥145,400',
     rating: 0,
     reviewCount: 0,
-    imagePath: 'assets/shop_iphone.jpg',
+    imagePath: 'assets/images/originals/shop_iphone.jpg',
     url: 'https://ec.jal.co.jp/shop/g/g0114-MG684J/',
   ),
   _ShopProduct(
@@ -77,7 +77,7 @@ const _allProducts = [
     price: '¥10,800',
     rating: 0,
     reviewCount: 0,
-    imagePath: 'assets/shop_curry.jpg',
+    imagePath: 'assets/images/originals/shop_curry.jpg',
     url: 'https://ec.jal.co.jp/shop/g/g0002-4654J/',
   ),
   _ShopProduct(
@@ -85,7 +85,7 @@ const _allProducts = [
     price: '¥2,138',
     rating: 0,
     reviewCount: 0,
-    imagePath: 'assets/shop_skytime.jpg',
+    imagePath: 'assets/images/originals/shop_skytime.jpg',
     url: 'https://ec.jal.co.jp/shop/g/g0002-3391J/',
   ),
 ];

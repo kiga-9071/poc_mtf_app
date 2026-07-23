@@ -7,19 +7,19 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../controllers/content_master_controller.dart';
-import '../../controllers/locale_controller.dart';
-import '../../controllers/theme_controller.dart';
-import '../../l10n.dart';
-import '../../services/analytics_service.dart';
-import '../../services/content_update_service.dart';
-import '../../services/notification_service.dart';
-import '../../services/storage_limit_service.dart';
-import 'content_featured_card.dart';
-import 'storage_limit_dialog.dart';
-import 'content_preview_card.dart';
-import 'shop_tab.dart';
-import 'youtube_tab.dart';
+import '../models/controllers/content_master_controller.dart';
+import '../../../shared/components/hooks/locale_controller.dart';
+import '../../../shared/components/hooks/theme_controller.dart';
+import '../../../core/utils/l10n.dart';
+import '../../../shared/features/analytics/services/analytics_service.dart';
+import '../repositories/remote/content_update_service.dart';
+import '../../../features/notification/repositories/notification_service.dart';
+import '../repositories/local/storage_limit_service.dart';
+import '../widgets/content_featured_card.dart';
+import '../widgets/storage_limit_dialog.dart';
+import '../widgets/content_preview_card.dart';
+import '../widgets/shop_tab.dart';
+import '../widgets/youtube_tab.dart';
 
 // ── ストレージ初期化（テスト用） ────────────────────────────────────────────
 
@@ -424,7 +424,7 @@ class ContentListPage extends HookConsumerWidget {
     );
     if (url == null) return card;
     return GestureDetector(
-      onTap: () => context.push('/webview', extra: url),
+      onTap: () => context.push('/webview', extra: (url: url, showBackToList: true)),
       child: card,
     );
   }
@@ -625,7 +625,7 @@ class ContentListPage extends HookConsumerWidget {
                         left: 0,
                         right: 0,
                         child: Image.asset(
-                          'assets/diagonal_mask.png',
+                          'assets/images/originals/diagonal_mask.png',
                           width: 390,
                           height: 344,
                           fit: BoxFit.cover,
@@ -726,7 +726,7 @@ class ContentListPage extends HookConsumerWidget {
                           extra: 'https://www.ja-zcf.co.jp/learned/all-japan/',
                         ),
                         child: Image.asset(
-                          'assets/banner_zennoh_chicken.png',
+                          'assets/images/originals/banner_zennoh_chicken.png',
                           width: double.infinity,
                           fit: BoxFit.fitWidth,
                         ),
@@ -753,28 +753,28 @@ class ContentListPage extends HookConsumerWidget {
                                       children: [
                                         _buildStaticArticleCard(
                                           context: context,
-                                          imagePath: 'assets/kochi_katsuo.jpg',
+                                          imagePath: 'assets/images/originals/kochi_katsuo.jpg',
                                           tag: '高知',
                                           title: '初夏、かつおを食べに',
                                           url: 'https://ontrip.jal.co.jp/chugoku-shikoku/17834167',
                                         ),
                                         _buildStaticArticleCard(
                                           context: context,
-                                          imagePath: 'assets/local_chain_ramen.jpg',
+                                          imagePath: 'assets/images/originals/local_chain_ramen.jpg',
                                           tag: 'グルメ',
                                           title: '噂のローカルチェーン飯',
                                           url: 'https://ontrip.jal.co.jp/hokkaido/17777179',
                                         ),
                                         _buildStaticArticleCard(
                                           context: context,
-                                          imagePath: 'assets/sora_gourmet_aomori.jpg',
+                                          imagePath: 'assets/images/originals/sora_gourmet_aomori.jpg',
                                           tag: '沖縄',
                                           title: '食べたい！買いたい！空グルメ！',
                                           url: 'https://ontrip.jal.co.jp/okinawa/17707921',
                                         ),
                                         _buildStaticArticleCard(
                                           context: context,
-                                          imagePath: 'assets/torimeshi_kagoshima.png',
+                                          imagePath: 'assets/images/originals/torimeshi_kagoshima.png',
                                           tag: 'ad',
                                           tags: const ['ad', '鹿児島'],
                                           title: '戦前から伝わる「高浜とりめし」と「高浜とりめし学会」が、すごい！',
@@ -782,14 +782,14 @@ class ContentListPage extends HookConsumerWidget {
                                         ),
                                         _buildStaticArticleCard(
                                           context: context,
-                                          imagePath: 'assets/pickup_carlease.jpg',
+                                          imagePath: 'assets/images/originals/pickup_carlease.jpg',
                                           tag: 'カーリース',
                                           title: '【2026年6月最新】カーリースおすすめ12社を比較して紹介！',
                                           url: 'https://skywardplus.jal.co.jp/plus_one/solution/car_lease/recommend/',
                                         ),
                                         _buildStaticArticleCard(
                                           context: context,
-                                          imagePath: 'assets/pickup_okamoto_sanbashi.jpg',
+                                          imagePath: 'assets/images/originals/pickup_okamoto_sanbashi.jpg',
                                           tag: '千葉',
                                           title: '岡本桟橋（原岡桟橋）徹底ガイド｜絶景の夕日と富士山、アクセス情報まとめ',
                                           url: 'https://skywardplus.jal.co.jp/hanto/plus_one/okamoto-sanbashi/',

@@ -10,16 +10,16 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../controllers/content_master_controller.dart';
-import '../../entities/pdf_content.dart';
-import '../../entities/viewer_args.dart';
-import '../../l10n.dart';
-import '../../services/storage_limit_service.dart';
+import '../models/controllers/content_master_controller.dart';
+import '../models/entities/pdf_content.dart';
+import '../models/entities/viewer_args.dart';
+import '../../../core/utils/l10n.dart';
+import '../repositories/local/storage_limit_service.dart';
 import 'storage_limit_dialog.dart';
-import '../../services/analytics_service.dart';
-import '../../services/content_update_service.dart';
-import '../../services/pdf_document_cache.dart';
-import '../../services/pdf_preview_cache.dart';
+import '../../../shared/features/analytics/services/analytics_service.dart';
+import '../repositories/remote/content_update_service.dart';
+import '../repositories/local/pdf_document_cache.dart';
+import '../repositories/local/pdf_preview_cache.dart';
 
 /// PDFの1ページ目サムネイルを大きく表示するグリッド用カードウィジェット。
 /// - ダウンロード済み: PDFの1ページ目をサムネイル表示

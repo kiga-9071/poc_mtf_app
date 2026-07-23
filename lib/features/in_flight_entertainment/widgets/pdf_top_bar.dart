@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../l10n.dart';
-import 'pdf_viewer_constants.dart';
+import '../../../core/utils/l10n.dart';
+import '../constants/pdf_viewer_constants.dart';
 
 /// PDFビューアー上部のカスタムバー。
 /// 標準の AppBar を使わず独自実装することで PDF 上にオーバーレイ表示できる。

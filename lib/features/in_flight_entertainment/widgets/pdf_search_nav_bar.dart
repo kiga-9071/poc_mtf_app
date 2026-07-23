@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../l10n.dart';
+import '../../../core/utils/l10n.dart';
 
 /// キーワード検索のヒット一覧をナビゲートするバー。
 /// トップバーの直下に表示され、検索クエリ・件数・前後移動ボタンを持つ。

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 
-import '../../controllers/search_controller.dart';
-import '../../entities/search_match.dart';
-import '../../l10n.dart';
+import '../models/controllers/search_controller.dart';
+import '../models/entities/search_match.dart';
+import '../../../core/utils/l10n.dart';
 
 /// 目次・ブックマーク・キーワード検索の 3 タブを持つサイドドロワー。
 class PdfSideDrawer extends StatefulWidget {

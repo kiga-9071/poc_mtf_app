@@ -75,31 +75,31 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/diagonal_mask.png
-    - assets/skyward_cover.png
-    - assets/kochi_katsuo.jpg
-    - assets/local_chain_ramen.jpg
-    - assets/sora_gourmet_aomori.jpg
-    - assets/ichiro_malt.jpg
-    - assets/minami_aso.jpg
-    - assets/sora_gourmet_memanbetsu.jpg
-    - assets/shop_single.png
-    - assets/shop_lohme.png
-    - assets/shop_famillea.png
-    - assets/shop_toystory.png
-    - assets/shop_unagi.jpg
-    - assets/shop_iphone.jpg
-    - assets/shop_curry.jpg
-    - assets/shop_skytime.jpg
-    - assets/pickup_carlease.jpg
-    - assets/pickup_okamoto_sanbashi.jpg
-    - assets/jalshop_catalog.png
-    - assets/banner_zennoh_chicken.png
-    - assets/torimeshi_kagoshima.png
+    - assets/images/originals/diagonal_mask.png
+    - assets/images/originals/skyward_cover.png
+    - assets/images/originals/kochi_katsuo.jpg
+    - assets/images/originals/local_chain_ramen.jpg
+    - assets/images/originals/sora_gourmet_aomori.jpg
+    - assets/images/originals/ichiro_malt.jpg
+    - assets/images/originals/minami_aso.jpg
+    - assets/images/originals/sora_gourmet_memanbetsu.jpg
+    - assets/images/originals/shop_single.png
+    - assets/images/originals/shop_lohme.png
+    - assets/images/originals/shop_famillea.png
+    - assets/images/originals/shop_toystory.png
+    - assets/images/originals/shop_unagi.jpg
+    - assets/images/originals/shop_iphone.jpg
+    - assets/images/originals/shop_curry.jpg
+    - assets/images/originals/shop_skytime.jpg
+    - assets/images/originals/pickup_carlease.jpg
+    - assets/images/originals/pickup_okamoto_sanbashi.jpg
+    - assets/images/originals/jalshop_catalog.png
+    - assets/images/originals/banner_zennoh_chicken.png
+    - assets/images/originals/torimeshi_kagoshima.png
 
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon.png"
+  image_path: "assets/images/icons/icon.png"
   min_sdk_android: 21
   remove_alpha_ios: true

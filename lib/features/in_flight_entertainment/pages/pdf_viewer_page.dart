@@ -12,25 +12,25 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
-import '../../services/analytics_service.dart';
-import '../../services/capture_protection_service.dart';
-import '../../services/pdf_document_cache.dart';
-import '../../services/pdf_preview_cache.dart';
+import '../../../shared/features/analytics/services/analytics_service.dart';
+import '../../../shared/components/utils/capture_protection_service.dart';
+import '../repositories/local/pdf_document_cache.dart';
+import '../repositories/local/pdf_preview_cache.dart';
 
-import '../../controllers/bookmark_controller.dart';
-import '../../controllers/memo_controller.dart';
-import '../../entities/search_match.dart';
-import '../../l10n.dart';
-import '../pdf_viewer/pdf_viewer_constants.dart';
-import 'pdf_link_overlay.dart';
-import 'pdf_search_highlight.dart';
-import 'pdf_tts_highlight.dart';
-import 'pdf_search_nav_bar.dart';
-import 'pdf_mini_map.dart';
-import 'pdf_side_drawer.dart';
-import 'pdf_thumbnail_strip.dart';
-import 'pdf_top_bar.dart';
-import '../../webview/webview_page.dart';
+import '../models/controllers/bookmark_controller.dart';
+import '../models/controllers/memo_controller.dart';
+import '../models/entities/search_match.dart';
+import '../../../core/utils/l10n.dart';
+import '../constants/pdf_viewer_constants.dart';
+import '../widgets/pdf_link_overlay.dart';
+import '../widgets/pdf_search_highlight.dart';
+import '../widgets/pdf_tts_highlight.dart';
+import '../widgets/pdf_search_nav_bar.dart';
+import '../widgets/pdf_mini_map.dart';
+import '../widgets/pdf_side_drawer.dart';
+import '../widgets/pdf_thumbnail_strip.dart';
+import '../widgets/pdf_top_bar.dart';
+import '../../../shared/features/webview/controllers/webview_page.dart';
 
 /// PDFを表示するメイン画面。
 ///

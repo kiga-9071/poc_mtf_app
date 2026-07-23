@@ -13,16 +13,16 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mock_server/pdf_asset_server.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'src/controllers/locale_controller.dart';
-import 'src/controllers/theme_controller.dart';
-import 'src/entities/viewer_args.dart';
-import 'src/l10n.dart';
-import 'src/pages/content_list/backnumber_page.dart';
-import 'src/pages/content_list/content_list_page.dart';
-import 'src/pages/pdf_viewer/pdf_viewer_page.dart';
-import 'src/services/notification_service.dart';
-import 'src/services/storage_limit_service.dart';
-import 'src/webview/webview_page.dart';
+import 'shared/components/hooks/locale_controller.dart';
+import 'shared/components/hooks/theme_controller.dart';
+import 'features/in_flight_entertainment/models/entities/viewer_args.dart';
+import 'core/utils/l10n.dart';
+import 'features/in_flight_entertainment/pages/backnumber_page.dart';
+import 'features/in_flight_entertainment/pages/content_list_page.dart';
+import 'features/in_flight_entertainment/pages/pdf_viewer_page.dart';
+import 'features/notification/repositories/notification_service.dart';
+import 'features/in_flight_entertainment/repositories/local/storage_limit_service.dart';
+import 'shared/features/webview/controllers/webview_page.dart';
 
 // ── グローバルキー ────────────────────────────────────────────────────────────
 
@@ -68,9 +68,12 @@ final _router = GoRouter(
     GoRoute(
       path: '/webview',
       builder: (context, state) {
-        // state.extra でPDFリンクタップ時に渡されたURLを受け取る
-        final url = state.extra as String;
-        return WebViewPage(url: url);
+        final extra = state.extra;
+        // PickUP 記事は ({String url, bool showBackToList}) レコードで渡す
+        if (extra is ({String url, bool showBackToList})) {
+          return WebViewPage(url: extra.url, showBackToList: extra.showBackToList);
+        }
+        return WebViewPage(url: extra as String);
       },
     ),
   ],

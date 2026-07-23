@@ -5,11 +5,11 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../controllers/content_master_controller.dart';
-import '../../controllers/locale_controller.dart';
-import '../../entities/pdf_content.dart';
-import '../../services/analytics_service.dart';
-import 'content_preview_card.dart';
+import '../models/controllers/content_master_controller.dart';
+import '../../../shared/components/hooks/locale_controller.dart';
+import '../models/entities/pdf_content.dart';
+import '../../../shared/features/analytics/services/analytics_service.dart';
+import '../widgets/content_preview_card.dart';
 
 enum _BnTab { all, downloaded }
 

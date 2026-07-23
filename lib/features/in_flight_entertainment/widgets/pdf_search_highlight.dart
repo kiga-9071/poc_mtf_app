@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 
-import '../../entities/search_match.dart';
+import '../models/entities/search_match.dart';
 
 /// 検索ヒット箇所をページ上にハイライト表示するオーバーレイウィジェット。
 ///

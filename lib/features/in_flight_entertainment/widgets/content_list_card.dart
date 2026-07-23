@@ -8,10 +8,10 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../entities/pdf_content.dart';
-import '../../entities/viewer_args.dart';
-import '../../l10n.dart';
-import '../../services/storage_limit_service.dart';
+import '../models/entities/pdf_content.dart';
+import '../models/entities/viewer_args.dart';
+import '../../../core/utils/l10n.dart';
+import '../repositories/local/storage_limit_service.dart';
 import 'storage_limit_dialog.dart';
 
 /// テキスト情報を中心としたリスト表示用のカードウィジェット。

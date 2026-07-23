@@ -5,8 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../entities/pdf_content.dart';
-import 'pdf_preview_cache.dart';
+import '../../models/entities/pdf_content.dart';
+import '../local/pdf_preview_cache.dart';
 
 /// マスターJSONの lastUpdatedAt とローカルDL日時を比較し、
 /// 差分があるコンテンツをバックグラウンドで再ダウンロードするサービス。

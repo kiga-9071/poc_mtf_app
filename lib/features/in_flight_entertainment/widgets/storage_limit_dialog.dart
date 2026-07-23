@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../services/storage_limit_service.dart';
+import '../repositories/local/storage_limit_service.dart';
 
 // ── 上限超過警告ダイアログ ────────────────────────────────────────────────────
 
