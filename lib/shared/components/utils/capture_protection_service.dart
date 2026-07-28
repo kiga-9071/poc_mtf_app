@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:screen_protector/screen_protector.dart';
@@ -19,6 +20,8 @@ class CaptureProtectionService {
       MethodChannel('jp.co.pdf.example.dev/capture_protection');
 
   static Future<void> enable() async {
+    // デバッグビルドではスクリーンキャプチャを許可する（開発時のスクリーンショット取得のため）
+    if (kDebugMode) return;
     if (Platform.isAndroid) {
       await _channel.invokeMethod<void>('enable');
     } else if (Platform.isIOS) {
