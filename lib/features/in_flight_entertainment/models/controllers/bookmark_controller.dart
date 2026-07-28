@@ -1,3 +1,7 @@
+// PDFビューアのブックマーク（ページ番号セット）を SharedPreferences で永続化するユーティリティ。
+//
+// ブックマークはファイルパスのハッシュをキーとして保存するため、
+// 異なるPDFファイルのブックマークが互いに干渉しない。
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';

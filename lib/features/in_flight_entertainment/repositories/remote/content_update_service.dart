@@ -116,6 +116,8 @@ class ContentUpdateService {
   }
 
   static void _clearThumbnailCache(String pdfPath) {
+    // PoC 想定の最大ページ数（20）分のキャッシュを消去する。
+    // 存在しないページのキャッシュ削除は catch で無視されるため安全。
     for (var i = 0; i < 20; i++) {
       try {
         File(PdfPreviewCache.cachePath(pdfPath, i)).deleteSync();
